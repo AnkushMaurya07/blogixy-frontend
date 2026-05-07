@@ -1,0 +1,53 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+import AppNavbar from './components/AppNavbar';
+import { useAppSelector } from './features/auth/hooks';
+import AuthPage from './pages/AuthPage';
+import DashboardPage from './pages/DashboardPage';
+import ExplorePage from './pages/ExplorePage';
+import HomePage from './pages/HomePage';
+import MessagesPage from './pages/MessagesPage';
+import NotificationsPage from './pages/NotificationsPage';
+
+function ProtectedRoute({ children }: { children: ReactElement }) {
+  const token = useAppSelector((s) => s.auth.accessToken);
+  return token ? children : <Navigate to="/auth" replace />;
+}
+
+export default function App() {
+  return (
+    <>
+      <AppNavbar />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
+  );
+}
