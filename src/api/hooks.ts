@@ -81,6 +81,17 @@ export const useCreateShareLink = () =>
     mutationFn: async (slug: string) => (await apiClient.post(`/blogs/${slug}/share/`)).data,
   });
 
+export const useSendBlogToUsers = () =>
+  useMutation({
+    mutationFn: async (payload: { slug: string; receiver_ids: number[]; content?: string }) =>
+      (
+        await apiClient.post(`/blogs/${payload.slug}/send/`, {
+          receiver_ids: payload.receiver_ids,
+          content: payload.content ?? '',
+        })
+      ).data,
+  });
+
 export const useNotifications = () => {
   const token = useAppSelector((s) => s.auth.accessToken);
   return useQuery({
@@ -97,6 +108,14 @@ export const useMarkNotificationRead = () => {
   return useMutation({
     mutationFn: async (notificationId: number) =>
       (await apiClient.patch(`/notifications/${notificationId}/`, { is_read: true })).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+};
+
+export const useMarkAllNotificationsRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await apiClient.post('/notifications/mark-all-read/')).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 };
@@ -177,6 +196,19 @@ export const useFollowUser = () => {
   });
 };
 
+export const useToggleFollow = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: number) => (await apiClient.post(`/auth/follows/${userId}/toggle/`)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
 export const useMessages = (withUser?: number) => {
   const token = useAppSelector((s) => s.auth.accessToken);
   return useQuery({
@@ -184,13 +216,14 @@ export const useMessages = (withUser?: number) => {
     queryFn: async () =>
       (await apiClient.get('/auth/messages/', { params: { with_user: withUser || undefined } })).data,
     enabled: Boolean(token) && Boolean(withUser),
+    refetchInterval: 4000,
   });
 };
 
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { receiver: number; content: string }) =>
+    mutationFn: async (payload: { receiver: number; content: string; message_type?: 'text' | 'blog_share'; shared_blog?: number }) =>
       (await apiClient.post('/auth/messages/', payload)).data,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', variables.receiver] });
@@ -199,3 +232,41 @@ export const useSendMessage = () => {
     },
   });
 };
+
+export const useUpdateMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: number; content: string }) =>
+      (await apiClient.patch(`/auth/messages/${payload.id}/`, { content: payload.content })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+};
+
+export const useDeleteMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => (await apiClient.delete(`/auth/messages/${id}/`)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+};
+
+export const useUserDetail = (userId?: number) => {
+  const token = useAppSelector((s) => s.auth.accessToken);
+  return useQuery({
+    queryKey: ['user-detail', userId],
+    queryFn: async () => (await apiClient.get(`/auth/users/${userId}/`)).data,
+    enabled: Boolean(token) && Boolean(userId),
+  });
+};
+
+export const useAiGenerateDraft = () =>
+  useMutation({
+    mutationFn: async (payload: { prompt: string; tone?: string; length?: 'short' | 'medium' | 'long' }) =>
+      (await apiClient.post('/ai/generate-draft/', payload)).data,
+  });

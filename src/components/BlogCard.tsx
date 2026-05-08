@@ -4,6 +4,7 @@ import ModeCommentRoundedIcon from '@mui/icons-material/ModeCommentRounded';
 import { Box, Button, Card, CardActions, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
+import { Link as RouterLink } from 'react-router-dom';
 
 import { absoluteMediaUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
@@ -75,7 +76,13 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
           <Stack spacing={1.75}>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Typography component="h3" variant="h6">
-                {blog.title}
+                <Box
+                  component={RouterLink}
+                  to={`/blogs/${blog.slug}`}
+                  sx={{ textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  {blog.title}
+                </Box>
               </Typography>
               <Chip
                 size="small"
@@ -97,6 +104,9 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
             >
               {blog.content}
             </Typography>
+            <Button component={RouterLink} to={`/blogs/${blog.slug}`} size="small" sx={{ alignSelf: 'flex-start', px: 0 }}>
+              Read full post
+            </Button>
             <Stack direction="row" spacing={2} sx={{ '& .MuiChip-root': { borderRadius: 2 } }}>
               <Chip variant="filled" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
               <Chip variant="filled" icon={<FavoriteBorderRoundedIcon fontSize="inherit" />} label={`${blog.likes_count} likes`} />

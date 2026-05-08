@@ -24,15 +24,20 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import BlogCommentsPanel from '../components/BlogCommentsPanel';
 import PageShell from '../components/PageShell';
 import { useExploreBlogs, useToggleLike } from '../api/hooks';
 import type { BlogPost } from '../api/types';
 import { useAppSelector } from '../features/auth/hooks';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
+import { useThrottleFn } from '../utils/useThrottleFn';
 
 export default function ExplorePage() {
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebouncedValue(searchInput, 320);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'latest' | 'ranking'>('ranking');
   const token = useAppSelector((s) => s.auth.accessToken);
@@ -43,6 +48,14 @@ export default function ExplorePage() {
   const onSortChange = (e: SelectChangeEvent<'ranking' | 'latest'>) => {
     setSort(e.target.value as 'ranking' | 'latest');
   };
+
+  const applySearch = useThrottleFn(() => {
+    setSearch(debouncedSearch);
+  }, 350);
+
+  useEffect(() => {
+    applySearch();
+  }, [applySearch, debouncedSearch]);
 
   return (
     <PageShell>
@@ -72,8 +85,8 @@ export default function ExplorePage() {
             <TextField
               fullWidth
               placeholder="Keywords, moods, hashtags…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -152,7 +165,11 @@ export default function ExplorePage() {
                   })}
                 >
                   <Stack spacing={1}>
-                    <Typography variant="h6">{blog.title}</Typography>
+                    <Typography variant="h6">
+                      <Box component={Link} to={`/blogs/${blog.slug}`} sx={{ color: 'inherit', textDecoration: 'none' }}>
+                        {blog.title}
+                      </Box>
+                    </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ minHeight: 72 }}>
                       {blog.content.slice(0, 220)}{blog.content.length > 220 ? '…' : ''}
                     </Typography>
@@ -179,6 +196,9 @@ export default function ExplorePage() {
                     }}
                   >
                     Toggle applause
+                  </Button>
+                  <Button component={Link} to={`/blogs/${blog.slug}`} variant="text" size="small" sx={{ px: 0 }}>
+                    Open full blog
                   </Button>
                   <BlogCommentsPanel slug={blog.slug} />
                 </Paper>

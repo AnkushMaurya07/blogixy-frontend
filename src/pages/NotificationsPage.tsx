@@ -5,7 +5,7 @@ import { Box, Button, Chip, Paper, Skeleton, Stack, Typography } from '@mui/mate
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
 
-import { useMarkNotificationRead, useNotifications } from '../api/hooks';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../api/hooks';
 import PageShell from '../components/PageShell';
 
 type NotificationRow = { id: number; title: string; message: string; is_read: boolean; created_at?: string };
@@ -14,8 +14,15 @@ export default function NotificationsPage() {
   const theme = useTheme();
   const { data, isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
-  const rows = (data as NotificationRow[] | undefined) ?? [];
+  const rows = (
+    data as (NotificationRow & {
+      notification_type?: string;
+      actor_name?: string;
+      target_blog_slug?: string;
+    })[] | undefined
+  ) ?? [];
 
   return (
     <PageShell>
@@ -29,6 +36,9 @@ export default function NotificationsPage() {
             Incoming messages ping here instantly—paired with richer context from posts and moderation events.
           </Typography>
         </Stack>
+        <Button variant="outlined" onClick={() => markAllRead.mutate()} sx={{ alignSelf: { md: 'flex-start' } }}>
+          Mark all read
+        </Button>
       </Stack>
 
       <Stack spacing={2}>
@@ -38,7 +48,7 @@ export default function NotificationsPage() {
           ))}
         {!isLoading &&
           rows.map((note, idx) => {
-            const isMessageAlert = note.title.toLowerCase().includes('message');
+            const isMessageAlert = (note.notification_type ?? note.title).toLowerCase().includes('message');
             return (
               <motion.div key={note.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.035 }}>
                 <Paper
@@ -81,9 +91,19 @@ export default function NotificationsPage() {
                         <Chip variant="outlined" label={note.is_read ? 'Read' : 'New'} />
                       </Stack>
                     </Stack>
+                      {note.actor_name ? (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
+                          Triggered by @{note.actor_name}
+                        </Typography>
+                      ) : null}
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {note.message}
                     </Typography>
+                      {note.target_blog_slug ? (
+                        <Typography variant="caption" sx={{ mt: 0.75 }}>
+                          Blog: {note.target_blog_slug}
+                        </Typography>
+                      ) : null}
                     {!note.is_read && (
                       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 2 }}>
                         <Button variant="text" sx={{ alignSelf: { md: 'flex-start' } }} onClick={() => markRead.mutate(note.id)}>
