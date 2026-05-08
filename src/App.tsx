@@ -2,13 +2,14 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactElement } from 'react';
 
 import AppNavbar from './components/AppNavbar';
-import { useAppSelector } from './features/auth/hooks';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ExplorePage from './pages/ExplorePage';
 import HomePage from './pages/HomePage';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import SettingsPage from './pages/SettingsPage';
+import { useAppSelector } from './features/auth/hooks';
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = useAppSelector((s) => s.auth.accessToken);
@@ -22,6 +23,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route
           path="/dashboard"

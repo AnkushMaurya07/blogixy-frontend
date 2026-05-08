@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { Alert, Button, Divider, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { motion } from 'framer-motion';
 import axios from 'axios';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { useLogin, useRegister } from '../api/hooks';
+import type { RoleType } from '../api/types';
+import PageShell from '../components/PageShell';
 import { useAppDispatch } from '../features/auth/hooks';
 import { setTokens } from '../features/auth/authSlice';
-import type { RoleType } from '../api/types';
 
 export default function AuthPage() {
   const [isRegister, setIsRegister] = useState(false);
@@ -21,6 +27,7 @@ export default function AuthPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
 
@@ -36,6 +43,7 @@ export default function AuthPage() {
         password: form.password,
       });
       dispatch(setTokens(loginResult));
+      navigate('/', { replace: true });
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.data) {
         const data = error.response.data as Record<string, string[] | string>;
@@ -50,53 +58,71 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="container" style={{ maxWidth: 520 }}>
-      <h2 className="mb-3">{isRegister ? 'Register' : 'Login'}</h2>
-      <form className="card card-body" onSubmit={onSubmit}>
-        <input
-          className="form-control mb-2"
-          placeholder="Username"
-          required
-          value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
-        />
-        {isRegister && (
-          <>
-            <input
-              className="form-control mb-2"
-              placeholder="Email"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-            <select
-              className="form-select mb-2"
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as RoleType })}
-            >
-              <option value="reader">Reader</option>
-              <option value="author">Author</option>
-              <option value="business">Business</option>
-            </select>
-          </>
-        )}
-        <input
-          type="password"
-          className="form-control mb-3"
-          placeholder="Password"
-          required
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-        />
-        {errorMessage && <div className="alert alert-danger py-2">{errorMessage}</div>}
-        <button type="submit" className="btn btn-primary">
-          Continue
-        </button>
-      </form>
-      <button className="btn btn-link mt-2 p-0" onClick={() => setIsRegister((v) => !v)}>
-        {isRegister ? 'Have an account? Login' : 'Need account? Register'}
-      </button>
-    </div>
+    <PageShell>
+      <Stack sx={{ alignItems: 'center', maxWidth: 520, mx: 'auto', textAlign: { xs: 'left', md: 'center' } }}>
+        <LockOutlinedIcon color="primary" sx={{ mb: 1.5 }} fontSize="large" />
+        <Typography variant="overline" color="primary.main" sx={{ letterSpacing: 3, fontWeight: 740 }}>
+          BlogXy Passport
+        </Typography>
+        <Typography variant="h4" gutterBottom sx={{ mb: { xs: 2, md: 3 }, fontWeight: 900 }}>
+          {isRegister ? 'Join the authoring collective' : 'Welcome back storyteller'}
+        </Typography>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Paper sx={{ px: { xs: 3, md: 4 }, py: { xs: 4, md: 4.5 }, width: '100%', borderRadius: 4 }}>
+            <form noValidate autoComplete="on" onSubmit={onSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  variant="filled"
+                  label="Username"
+                  autoComplete="username"
+                  required
+                  value={form.username}
+                  onChange={(event) => setForm({ ...form, username: event.target.value })}
+                />
+                {isRegister && (
+                  <>
+                    <TextField
+                      variant="filled"
+                      label="Email"
+                      autoComplete="email"
+                      required
+                      type="email"
+                      value={form.email}
+                      onChange={(event) => setForm({ ...form, email: event.target.value })}
+                    />
+                    <TextField variant="filled" label="Org role" select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as RoleType })}>
+                      <MenuItem value="reader">Reader</MenuItem>
+                      <MenuItem value="author">Author</MenuItem>
+                      <MenuItem value="business">Business</MenuItem>
+                    </TextField>
+                  </>
+                )}
+                <TextField
+                  variant="filled"
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                />
+                {errorMessage ? (
+                  <Alert severity="error" sx={{ mt: -0.75 }}>
+                    {errorMessage}
+                  </Alert>
+                ) : null}
+                <Button variant="contained" size="large" type="submit" sx={{ py: 1.5 }}>
+                  {isRegister ? 'Create account & sign in' : 'Continue securely'}
+                </Button>
+              </Stack>
+            </form>
+            <Divider sx={{ my: 3 }} />
+            <Button variant="text" fullWidth sx={{ typography: 'body2', fontWeight: 600 }} onClick={() => setIsRegister(!isRegister)}>
+              {isRegister ? 'Already wielding credentials? Jump to login' : 'Fresh join? Elevate into register mode'}
+            </Button>
+          </Paper>
+        </motion.div>
+      </Stack>
+    </PageShell>
   );
 }
