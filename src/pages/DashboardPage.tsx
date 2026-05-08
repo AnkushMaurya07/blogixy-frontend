@@ -20,7 +20,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 
-import { useAnalytics, useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
+import { useAiGenerateDraft, useAnalytics, useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
 import PageShell from '../components/PageShell';
 
 export default function DashboardPage() {
@@ -29,10 +29,12 @@ export default function DashboardPage() {
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [shareUrl, setShareUrl] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
   const createBlogMutation = useCreateBlog();
   const uploadMediaMutation = useUploadBlogMedia();
   const shareMutation = useCreateShareLink();
   const analyticsQuery = useAnalytics();
+  const aiGenerateMutation = useAiGenerateDraft();
 
   const totals = analyticsQuery.data as { total_posts: number; total_views: number; total_likes: number } | undefined;
 
@@ -155,6 +157,30 @@ export default function DashboardPage() {
               </Stack>
               <Divider />
               <Box component="form" onSubmit={submit} sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                  <TextField
+                    fullWidth
+                    label="AI prompt"
+                    variant="filled"
+                    placeholder="Generate a draft on growth storytelling for SaaS..."
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={async () => {
+                      if (!aiPrompt.trim()) return;
+                      const draft = await aiGenerateMutation.mutateAsync({ prompt: aiPrompt, length: 'medium' });
+                      setForm((prev) => ({
+                        ...prev,
+                        title: draft.title ?? prev.title,
+                        content: draft.content ?? prev.content,
+                      }));
+                    }}
+                  >
+                    Generate
+                  </Button>
+                </Stack>
                 <TextField
                   label="Title"
                   variant="filled"

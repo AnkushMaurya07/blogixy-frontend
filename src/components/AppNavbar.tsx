@@ -5,6 +5,9 @@ import {
   Divider,
   Drawer,
   IconButton,
+  Menu,
+  MenuItem,
+  ListItemText,
   Toolbar,
   Typography,
 } from '@mui/material';
@@ -33,6 +36,7 @@ export default function AppNavbar() {
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const shellMaxWidth = useAppSelector((s) => s.ui.shellMaxWidth);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
 
   const { data: notifications } = useNotifications();
   const unreadCount = useMemo(
@@ -101,6 +105,8 @@ export default function AppNavbar() {
     }
     return link.icon;
   };
+
+  const recentNotifications = (notifications as { id: number; title: string; message: string; is_read: boolean }[] | undefined)?.slice(0, 5) ?? [];
 
   const renderNav = () =>
     visible.map((link) => (
@@ -193,6 +199,20 @@ export default function AppNavbar() {
               >
                 {renderNav()}
                 <Divider flexItem orientation="vertical" sx={{ mx: 0.5, alignSelf: 'stretch' }} />
+                {token ? (
+                  <>
+                    <Button component={Link} to="/dashboard" variant="contained" size="medium">
+                      Create Post
+                    </Button>
+                    <Button
+                      variant="text"
+                      color="inherit"
+                      onClick={(e) => setNotifAnchorEl(e.currentTarget)}
+                    >
+                      Notifications
+                    </Button>
+                  </>
+                ) : null}
                 {!token ? (
                   <Button component={Link} to="/auth" variant="contained" color="primary" size="medium">
                     Sign in
@@ -224,6 +244,37 @@ export default function AppNavbar() {
           </Button>
         )}
       </Drawer>
+      <Menu
+        anchorEl={notifAnchorEl}
+        open={Boolean(notifAnchorEl)}
+        onClose={() => setNotifAnchorEl(null)}
+        slotProps={{ paper: { sx: { width: 340 } } }}
+      >
+        {recentNotifications.length === 0 ? (
+          <MenuItem onClick={() => setNotifAnchorEl(null)}>
+            <ListItemText primary="No recent notifications" secondary="You're all caught up." />
+          </MenuItem>
+        ) : (
+          recentNotifications.map((item) => (
+            <MenuItem
+              key={item.id}
+              component={Link}
+              to="/notifications"
+              onClick={() => setNotifAnchorEl(null)}
+            >
+              <ListItemText
+                primary={item.title}
+                secondary={item.message}
+
+              />
+            </MenuItem>
+          ))
+        )}
+        <Divider />
+        <MenuItem component={Link} to="/notifications" onClick={() => setNotifAnchorEl(null)}>
+          <ListItemText primary="View all notifications" />
+        </MenuItem>
+      </Menu>
     </>
   );
 }

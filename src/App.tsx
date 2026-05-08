@@ -8,6 +8,8 @@ import ExplorePage from './pages/ExplorePage';
 import HomePage from './pages/HomePage';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import BlogDetailPage from './pages/BlogDetailPage';
+import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import { useAppSelector } from './features/auth/hooks';
 
@@ -23,7 +25,24 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/:userId"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/auth" element={<AuthPage />} />
         <Route
           path="/dashboard"

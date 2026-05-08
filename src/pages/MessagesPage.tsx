@@ -1,6 +1,8 @@
 import ArrowBackIosNewRoundedIcon from '@mui/icons-material/ArrowBackIosNewRounded';
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import {
   Avatar,
   Box,
@@ -25,17 +27,20 @@ import PageShell from '../components/PageShell';
 import type { ConversationSummary } from '../api/types';
 import {
   useConversations,
-  useFollowUser,
+  useDeleteMessage,
   useMessages,
   useProfile,
   useSendMessage,
   useSuggestedUsers,
+  useToggleFollow,
+  useUpdateMessage,
 } from '../api/hooks';
+import { Link } from 'react-router-dom';
 
 type SuggestionsRailProps = {
   loading?: boolean;
   suggestions: { id: number; username: string }[];
-  followMutation: ReturnType<typeof useFollowUser>;
+  followMutation: ReturnType<typeof useToggleFollow>;
   slim?: boolean;
 };
 
@@ -99,8 +104,10 @@ export default function MessagesPage() {
   const conversationsQuery = useConversations();
   const suggestedQuery = useSuggestedUsers();
   const messagesQuery = useMessages(selectedUserId);
-  const followMutation = useFollowUser();
+  const followMutation = useToggleFollow();
   const sendMutation = useSendMessage();
+  const updateMessage = useUpdateMessage();
+  const deleteMessage = useDeleteMessage();
 
   const meId = (profileQuery.data as { id?: number } | undefined)?.id;
 
@@ -109,7 +116,17 @@ export default function MessagesPage() {
   const suggestions = suggestedQuery.data as { id: number; username: string }[] | undefined;
 
   const sortedMessages = useMemo(() => {
-    const raw = (messagesQuery.data as { id: number; sender: number; content: string; sender_name: string }[]) ?? [];
+    const raw = (
+      messagesQuery.data as {
+        id: number;
+        sender: number;
+        content: string;
+        sender_name: string;
+        message_type?: 'text' | 'blog_share';
+        shared_blog_slug?: string;
+        shared_blog_title?: string;
+      }[]
+    ) ?? [];
     return [...raw].reverse();
   }, [messagesQuery.data]);
 
@@ -127,7 +144,9 @@ export default function MessagesPage() {
       </Avatar>
       <Box>
         <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>
-          @{selectedConversation?.username ?? 'conversation'}
+          <Box component={Link} to={selectedConversation ? `/users/${selectedConversation.user_id}` : '#'} sx={{ color: 'inherit', textDecoration: 'none' }}>
+            @{selectedConversation?.username ?? 'conversation'}
+          </Box>
         </Typography>
         <Typography variant="caption" color="text.secondary">
           Live thread • encrypted transport coming soon
@@ -200,6 +219,9 @@ export default function MessagesPage() {
                           <Typography variant="subtitle2" sx={{ fontWeight: 650 }}>
                             @{conv.username}
                           </Typography>
+                          {(conv.unread_count ?? 0) > 0 && (
+                            <Chip size="small" color="error" label={`${conv.unread_count} new`} />
+                          )}
                           {conv.last_sender_id !== meId && (
                             <Chip size="small" color="warning" variant="outlined" label="Inbound" />
                           )}
@@ -265,6 +287,31 @@ export default function MessagesPage() {
                                 @{msg.sender_name}
                               </Typography>
                               <Typography variant="body2">{msg.content}</Typography>
+                              {msg.message_type === 'blog_share' && msg.shared_blog_slug ? (
+                                <Typography variant="caption" sx={{ display: 'block', mt: 0.75 }}>
+                                  Shared blog:{' '}
+                                  <Box component={Link} to={`/blogs/${msg.shared_blog_slug}`} sx={{ color: 'inherit' }}>
+                                    {msg.shared_blog_title || msg.shared_blog_slug}
+                                  </Box>
+                                </Typography>
+                              ) : null}
+                              {mine ? (
+                                <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={async () => {
+                                      const updated = prompt('Edit message', msg.content);
+                                      if (!updated || updated === msg.content) return;
+                                      await updateMessage.mutateAsync({ id: msg.id, content: updated });
+                                    }}
+                                  >
+                                    <EditRoundedIcon fontSize="inherit" />
+                                  </IconButton>
+                                  <IconButton size="small" onClick={() => deleteMessage.mutate(msg.id)}>
+                                    <DeleteRoundedIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Stack>
+                              ) : null}
                             </Box>
                           </Box>
                         </motion.div>
