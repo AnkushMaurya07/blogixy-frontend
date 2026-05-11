@@ -2,12 +2,15 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 export type UILayoutDensity = 'comfortable' | 'standard' | 'compact';
 export type UIShellMaxWidth = 'full' | 'xl' | 'lg' | 'md';
+export type DashboardMascot = 'cat' | 'dog';
 
 export type UIState = {
   themeMode: 'light' | 'dark';
   primaryMain: string;
   layoutDensity: UILayoutDensity;
   shellMaxWidth: UIShellMaxWidth;
+  /** Tiny Three.js companion on the author dashboard (Settings → companion). */
+  dashboardMascot: DashboardMascot;
 };
 
 const STORAGE_KEY = 'blogixy-ui-v1';
@@ -17,6 +20,7 @@ const defaults: UIState = {
   primaryMain: '#2563eb',
   layoutDensity: 'standard',
   shellMaxWidth: 'xl',
+  dashboardMascot: 'cat',
 };
 
 function loadStored(): Partial<UIState> {
@@ -55,14 +59,24 @@ const uiSlice = createSlice({
     setShellMaxWidth(state, action: PayloadAction<UIShellMaxWidth>) {
       state.shellMaxWidth = action.payload;
     },
+    setDashboardMascot(state, action: PayloadAction<DashboardMascot>) {
+      state.dashboardMascot = action.payload;
+    },
     resetUiPreferences(state) {
       Object.assign(state, defaults);
     },
   },
 });
 
-export const { setPrimaryMain, setThemeMode, toggleThemeMode, setLayoutDensity, setShellMaxWidth, resetUiPreferences } =
-  uiSlice.actions;
+export const {
+  setPrimaryMain,
+  setThemeMode,
+  toggleThemeMode,
+  setLayoutDensity,
+  setShellMaxWidth,
+  setDashboardMascot,
+  resetUiPreferences,
+} = uiSlice.actions;
 
 export default uiSlice.reducer;
 

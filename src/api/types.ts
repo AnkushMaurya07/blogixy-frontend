@@ -26,6 +26,10 @@ export type BlogPost = {
   id: number;
   author: number;
   author_name: string;
+  /** Absolute URL when set, else null — use `userAvatarUrl` for feed display. */
+  author_avatar?: string | null;
+  /** Present when API includes favorite context for the current user. */
+  is_favorited?: boolean;
   title: string;
   slug: string;
   content: string;
@@ -49,9 +53,18 @@ export type UserProfile = {
   avatar?: string | null;
 };
 
-export type HomeFeedResponse = {
-  following_feed: BlogPost[];
-  discovery_feed: BlogPost[];
+/** Paginated home timeline (following + discover merged for auth users). */
+export type PaginatedHomeFeedResponse = {
+  results: BlogPost[];
+  count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+};
+
+export type FavoriteEntry = {
+  favorited_at: string;
+  blog: BlogPost;
 };
 
 export type ConversationSummary = {

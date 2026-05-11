@@ -1,8 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../features/auth/hooks';
+import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 import { apiClient } from './client';
-import type { BlogPayload, RegisterPayload } from './types';
+import type {
+  BlogPayload,
+  BlogPost,
+  FavoriteEntry,
+  PaginatedHomeFeedResponse,
+  RegisterPayload,
+  UserProfile,
+} from './types';
 
 export const useRegister = () =>
   useMutation({
@@ -24,31 +32,152 @@ export const useProfile = () => {
   });
 };
 
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      username?: string;
+      email?: string;
+      profile_title?: string;
+      bio?: string;
+      avatar?: File | null;
+    }) => {
+      // Multipart PATCH is flaky in some browsers/network stacks; use JSON when no file upload.
+      if (payload.avatar) {
+        // eslint-disable-next-line no-console -- intentional debug trace
+        console.log('[useUpdateProfile] POST multipart', {
+          username: payload.username,
+          email: payload.email,
+          profile_title: payload.profile_title,
+          bioLen: payload.bio?.length,
+          avatar: `${payload.avatar.name} (${payload.avatar.size}b)`,
+        });
+        const fd = new FormData();
+        if (payload.username !== undefined) fd.append('username', payload.username);
+        if (payload.email !== undefined) fd.append('email', payload.email);
+        if (payload.profile_title !== undefined) fd.append('profile_title', payload.profile_title ?? '');
+        if (payload.bio !== undefined) fd.append('bio', payload.bio ?? '');
+        fd.append('avatar', payload.avatar);
+        const data = (await apiClient.post<UserProfile>('/auth/profile/', fd)).data;
+        // eslint-disable-next-line no-console -- intentional debug trace
+        console.log('[useUpdateProfile] multipart success', { id: data.id, username: data.username });
+        return data;
+      }
+      const body: Record<string, string> = {};
+      if (payload.username !== undefined) body.username = payload.username;
+      if (payload.email !== undefined) body.email = payload.email;
+      if (payload.profile_title !== undefined) body.profile_title = payload.profile_title ?? '';
+      if (payload.bio !== undefined) body.bio = payload.bio ?? '';
+      // eslint-disable-next-line no-console -- intentional debug trace
+      console.log('[useUpdateProfile] POST JSON', body);
+      const data = (await apiClient.post<UserProfile>('/auth/profile/', body)).data;
+      // eslint-disable-next-line no-console -- intentional debug trace
+      console.log('[useUpdateProfile] JSON success', { id: data.id, username: data.username });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['user-detail'] });
+    },
+  });
+};
+
+/** Checks username availability for profile / signup (`username` must match server rules). */
+export const useUsernameAvailability = (draftUsername: string, currentUsername: string) => {
+  const debounced = useDebouncedValue(draftUsername.trim(), 400);
+  const needsCheck = debounced.length > 0 && debounced !== currentUsername;
+  return useQuery({
+    queryKey: ['username-check', debounced],
+    queryFn: async () =>
+      (await apiClient.get<{ available: boolean }>('/auth/username-check/', { params: { username: debounced } })).data,
+    enabled: needsCheck,
+    staleTime: 25_000,
+  });
+};
+
 export const useBlogs = () =>
   useQuery({
-    queryKey: ['blogs'],
-    queryFn: async () => (await apiClient.get('/blogs/')).data,
-  });
-
-export const useHomeFeed = () =>
-  useQuery({
-    queryKey: ['blogs', 'home-feed'],
-    queryFn: async () => (await apiClient.get('/blogs/feed/')).data,
-    staleTime: 30_000,
-    refetchOnWindowFocus: true,
-  });
-
-
-export const useExploreBlogs = (params: { search: string; sort: 'latest' | 'ranking' }) =>
-  useQuery({
-    queryKey: ['blogs', 'explore', params],
+    queryKey: ['blogs', 'legacy-list'],
     queryFn: async () =>
+      (await apiClient.get<PaginatedHomeFeedResponse>('/blogs/', { params: { page: 1, page_size: 100 } })).data
+        .results,
+  });
+
+const HOME_FEED_PAGE_SIZE = 10;
+const EXPLORE_PAGE_SIZE = 10;
+
+export type HomeFeedSection = 'all' | 'following' | 'discover';
+
+export const useInfiniteHomeFeed = (opts: { section: HomeFeedSection; enabled?: boolean }) =>
+  useInfiniteQuery({
+    queryKey: ['blogs', 'home-feed', HOME_FEED_PAGE_SIZE, opts.section],
+    queryFn: async ({ pageParam }) =>
       (
-        await apiClient.get('/blogs/', {
-          params: { search: params.search || undefined, sort: params.sort },
+        await apiClient.get<PaginatedHomeFeedResponse>('/blogs/feed/', {
+          params: {
+            page: pageParam,
+            page_size: HOME_FEED_PAGE_SIZE,
+            section: opts.section,
+          },
         })
       ).data,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.has_next ? lastPage.page + 1 : undefined),
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    enabled: opts.enabled ?? true,
+  });
+
+export const useInfiniteExploreBlogs = (params: { search: string; sort: 'latest' | 'ranking' }) =>
+  useInfiniteQuery({
+    queryKey: ['blogs', 'explore', params.search, params.sort, EXPLORE_PAGE_SIZE],
+    queryFn: async ({ pageParam }) =>
+      (
+        await apiClient.get<PaginatedHomeFeedResponse>('/blogs/', {
+          params: {
+            search: params.search || undefined,
+            sort: params.sort,
+            page: pageParam,
+            page_size: EXPLORE_PAGE_SIZE,
+          },
+        })
+      ).data,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.has_next ? lastPage.page + 1 : undefined),
     staleTime: 20_000,
+  });
+
+export const useFavoriteBlogs = () => {
+  const token = useAppSelector((s) => s.auth.accessToken);
+  return useQuery({
+    queryKey: ['blogs', 'favorites'],
+    queryFn: async () => (await apiClient.get('/blogs/favorites/')).data as FavoriteEntry[],
+    enabled: Boolean(token),
+    staleTime: 25_000,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useToggleFavorite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (slug: string) => (await apiClient.post(`/blogs/${slug}/favorite-toggle/`)).data as { favorited: boolean },
+    onSuccess: (_data, slug) => {
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'explore'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'by-author'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-detail', slug] });
+    },
+  });
+};
+
+export const useUserBlogs = (authorId: number | undefined) =>
+  useQuery({
+    queryKey: ['blogs', 'by-author', authorId],
+    queryFn: async () => (await apiClient.get('/blogs/', { params: { author: authorId } })).data as BlogPost[],
+    enabled: typeof authorId === 'number' && authorId > 0,
+    staleTime: 25_000,
   });
 
 export const useCreateBlog = () => {
@@ -58,6 +187,7 @@ export const useCreateBlog = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });
 };

@@ -4,6 +4,7 @@ import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import PetsRoundedIcon from '@mui/icons-material/PetsRounded';
 import ViewQuiltRoundedIcon from '@mui/icons-material/ViewQuiltRounded';
 import {
   Box,
@@ -25,10 +26,12 @@ import PageShell from '../components/PageShell';
 
 import {
   resetUiPreferences,
+  setDashboardMascot,
   setLayoutDensity,
   setPrimaryMain,
   setShellMaxWidth,
   setThemeMode,
+  type DashboardMascot,
   type UILayoutDensity,
   type UIShellMaxWidth,
 } from '../features/ui/uiSlice';
@@ -235,6 +238,36 @@ export default function SettingsPage() {
             </Paper>
           </motion.div>
         </GridTwoColumn>
+
+        <motion.div layout>
+          <Paper sx={{ borderRadius: 4, overflow: 'hidden' }}>
+            <Stack direction="row" spacing={2} sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), px: 4, py: 3 }}>
+              <PetsRoundedIcon color="secondary" />
+              <Box>
+                <Typography variant="h6">Dashboard companion</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  A lit Three.js scene in the dashboard’s right column — eyes track your cursor; click for a meow or bark (Web Audio).
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack spacing={2} sx={{ p: { xs: 3, md: 4 } }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 720 }}>
+                Companion species
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                value={ui.dashboardMascot}
+                onChange={(_, v: DashboardMascot | null) => v && dispatch(setDashboardMascot(v))}
+              >
+                <ToggleButton value="cat">Cat</ToggleButton>
+                <ToggleButton value="dog">Dog</ToggleButton>
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary">
+                Open the dashboard to see it; Three.js loads only when that page is open.
+              </Typography>
+            </Stack>
+          </Paper>
+        </motion.div>
       </Stack>
     </PageShell>
   );
