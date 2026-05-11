@@ -6,7 +6,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 
-import { absoluteMediaUrl } from '../api/mediaUrl';
+import { blogCoverImageUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 type BlogCardProps = {
@@ -16,9 +16,7 @@ type BlogCardProps = {
 
 export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
   const theme = useTheme();
-  const cover = absoluteMediaUrl(
-    blog.media_items?.find((m) => m.media_type === 'image')?.file ?? blog.media_items?.[0]?.file,
-  );
+  const cover = blogCoverImageUrl(blog, { width: 800, height: 450 });
 
   return (
     <motion.article
@@ -45,34 +43,24 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               : 'linear-gradient(170deg,#151c2b,#141b29)',
         }}
       >
-        {cover ? (
+        <Box
+          sx={{
+            lineHeight: 0,
+            maxHeight: 220,
+            overflow: 'hidden',
+            borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
+          }}
+        >
           <Box
-            sx={{
-              lineHeight: 0,
-              maxHeight: 220,
-              overflow: 'hidden',
-              borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
-            }}
-          >
-            <Box
-              component="img"
-              loading="lazy"
-              decoding="async"
-              src={cover}
-              alt=""
-              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
-            />
-          </Box>
-        ) : (
-          <Box
-            sx={{
-              height: 10,
-              width: '100%',
-              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main ?? '#22d3ee'})`,
-            }}
+            component="img"
+            loading="lazy"
+            decoding="async"
+            src={cover}
+            alt=""
+            sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
           />
-        )}
-        <CardContent sx={{ flexGrow: 1, pt: cover ? 2.5 : 3.25, pb: 1 }}>
+        </Box>
+        <CardContent sx={{ flexGrow: 1, pt: 2.5, pb: 1 }}>
           <Stack spacing={1.75}>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Typography component="h3" variant="h6">

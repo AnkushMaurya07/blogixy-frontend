@@ -1,3 +1,5 @@
+import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
+import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
@@ -17,8 +19,8 @@ import {
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { useCreateComment, useCreateShareLink, useSendBlogToUsers, useToggleLike } from '../api/hooks';
-import { absoluteMediaUrl } from '../api/mediaUrl';
+import { useCreateComment, useCreateShareLink, useSendBlogToUsers, useToggleFavorite, useToggleLike } from '../api/hooks';
+import { absoluteMediaUrl, blogCoverImageUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 import PageShell from '../components/PageShell';
 import { useAppSelector } from '../features/auth/hooks';
@@ -52,12 +54,16 @@ export default function BlogDetailPage() {
   const createShare = useCreateShareLink();
   const sendBlog = useSendBlogToUsers();
   const toggleLike = useToggleLike();
+  const toggleFavorite = useToggleFavorite();
   const createComment = useCreateComment(slug);
 
   const blog = blogQuery.data as BlogPost | undefined;
   const comments = (commentsQuery.data as { id: number; user_name: string; content: string }[] | undefined) ?? [];
 
   const mediaItems = useMemo(() => blog?.media_items?.map((item) => ({ ...item, abs: absoluteMediaUrl(item.file) })) ?? [], [blog]);
+  const hasImageMedia = Boolean(
+    blog?.media_items?.some((m) => m.media_type === 'image'),
+  );
 
   if (!blog) {
     return (
@@ -72,8 +78,23 @@ export default function BlogDetailPage() {
       <Button variant="text" onClick={() => navigate(-1)} sx={{ mb: 2 }}>
         Back
       </Button>
-      <Paper sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 4 }}>
-        <Stack spacing={2}>
+      <Paper sx={{ p: 0, overflow: 'hidden', borderRadius: 4 }}>
+        {!hasImageMedia && (
+          <Box
+            component="img"
+            src={blogCoverImageUrl(blog, { width: 1200, height: 540 })}
+            alt=""
+            loading="eager"
+            decoding="async"
+            sx={{
+              width: '100%',
+              display: 'block',
+              maxHeight: { xs: 240, sm: 320 },
+              objectFit: 'cover',
+            }}
+          />
+        )}
+        <Stack spacing={2} sx={{ p: { xs: 2.5, md: 4 } }}>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <Avatar>{blog.author_name.slice(0, 1).toUpperCase()}</Avatar>
             <Box>
@@ -103,9 +124,17 @@ export default function BlogDetailPage() {
               ))}
             </Stack>
           )}
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
             <Button variant="outlined" startIcon={<FavoriteBorderRoundedIcon />} disabled={!token} onClick={() => toggleLike.mutate(slug)}>
               Like
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={!token}
+              startIcon={blog.is_favorited ? <BookmarkAddedRoundedIcon /> : <BookmarkBorderRoundedIcon />}
+              onClick={() => toggleFavorite.mutate(slug)}
+            >
+              {blog.is_favorited ? 'Saved' : 'Save to favourites'}
             </Button>
             <Button
               variant="outlined"

@@ -1,3 +1,5 @@
+import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
+import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import ModeCommentRoundedIcon from '@mui/icons-material/ModeCommentRounded';
@@ -10,6 +12,7 @@ import {
   Chip,
   FormControl,
   Grid,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -18,32 +21,54 @@ import {
   Skeleton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
   type SelectChangeEvent,
   type Theme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import BlogCommentsPanel from '../components/BlogCommentsPanel';
 import PageShell from '../components/PageShell';
-import { useExploreBlogs, useToggleLike } from '../api/hooks';
+import { useInfiniteExploreBlogs, useToggleFavorite, useToggleLike } from '../api/hooks';
 import type { BlogPost } from '../api/types';
 import { useAppSelector } from '../features/auth/hooks';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { useThrottleFn } from '../utils/useThrottleFn';
 
 export default function ExplorePage() {
+  const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput, 320);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'latest' | 'ranking'>('ranking');
   const token = useAppSelector((s) => s.auth.accessToken);
 
-  const { data, isLoading, refetch, isFetching } = useExploreBlogs({ search, sort });
+  const qParam = searchParams.get('q')?.trim() ?? '';
+  useEffect(() => {
+    if (!qParam) return;
+    setSearchInput(qParam);
+    setSearch(qParam);
+  }, [qParam]);
+
+  const exploreLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const {
+    data: explorePages,
+    isLoading: exploreLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    isFetching,
+    isError: exploreError,
+  } = useInfiniteExploreBlogs({ search, sort });
   const toggleLike = useToggleLike();
+  const toggleFavorite = useToggleFavorite();
+
+  const explorePosts = useMemo(() => explorePages?.pages.flatMap((p) => p.results) ?? [], [explorePages]);
 
   const onSortChange = (e: SelectChangeEvent<'ranking' | 'latest'>) => {
     setSort(e.target.value as 'ranking' | 'latest');
@@ -57,13 +82,35 @@ export default function ExplorePage() {
     applySearch();
   }, [applySearch, debouncedSearch]);
 
+  useEffect(() => {
+    const el = exploreLoadMoreRef.current;
+    if (!el || exploreError) {
+      return;
+    }
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void fetchNextPage();
+        }
+      },
+      { root: null, rootMargin: '320px', threshold: 0 },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [exploreError, fetchNextPage, hasNextPage, isFetchingNextPage, explorePosts.length]);
+
   return (
     <PageShell>
-      <Typography variant="h3" sx={{ mb: 1 }}>
-        Explore galaxy of posts
+      <Typography variant="h3" sx={{ mb: 1, fontWeight: 800, letterSpacing: -0.6 }}>
+        Explore
       </Typography>
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-        Search by keyword, rank by freshness or engagement. Category filters landing soon.
+      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4, maxWidth: 640 }}>
+        {
+          "Search posts by keyword. Sort by what's moving or what's newest — same mental model as discovery feeds on larger networks, tuned for long-form posts."
+        }
       </Typography>
 
       <Paper
@@ -102,8 +149,8 @@ export default function ExplorePage() {
           </Grid>
           <Grid size={{ xs: 12, sm: 8, md: 4 }}>
             <FormControl variant="filled" fullWidth>
-              <InputLabel id="explore-sort">Signal</InputLabel>
-              <Select variant="filled" labelId="explore-sort" value={sort} label="Signal" onChange={onSortChange}>
+              <InputLabel id="explore-sort">Sort</InputLabel>
+              <Select variant="filled" labelId="explore-sort" value={sort} label="Sort" onChange={onSortChange}>
                 <MenuItem value="ranking">Momentum (likes + chatter)</MenuItem>
                 <MenuItem value="latest">Latest drops</MenuItem>
               </Select>
@@ -134,7 +181,16 @@ export default function ExplorePage() {
         </Stack>
       </Paper>
 
-      {isLoading ? (
+      {exploreError ? (
+        <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+          Could not load explore.{' '}
+          <Button variant="text" size="small" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </Typography>
+      ) : null}
+
+      {exploreLoading && explorePosts.length === 0 ? (
         <Grid container spacing={3}>
           {Array.from({ length: 6 }).map((_, i) => (
             <Grid size={{ xs: 12, md: 6 }} key={`ex-${String(i)}`}>
@@ -144,7 +200,7 @@ export default function ExplorePage() {
         </Grid>
       ) : (
         <Grid container spacing={3}>
-          {(data as BlogPost[] | undefined)?.map((blog: BlogPost, idx: number) => (
+          {explorePosts.map((blog: BlogPost, idx: number) => (
             <Grid size={{ xs: 12, md: 6 }} key={blog.id}>
               <motion.article
                 initial={{ opacity: 0, y: 12 }}
@@ -174,10 +230,25 @@ export default function ExplorePage() {
                       {blog.content.slice(0, 220)}{blog.content.length > 220 ? '…' : ''}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', '& .MuiChip-root': { borderRadius: 2 } }}>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center', '& .MuiChip-root': { borderRadius: 2 } }}>
                     <Chip size="medium" variant="filled" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
                     <Chip variant="filled" icon={<FavoriteBorderRoundedIcon />} label={`${blog.likes_count} likes`} />
                     <Chip variant="filled" icon={<ModeCommentRoundedIcon />} label={`${blog.comments_count} comments`} />
+                    {token ? (
+                      <Tooltip title={blog.is_favorited ? 'Remove from favourites' : 'Save to favourites'}>
+                        <IconButton
+                          size="small"
+                          aria-label="Toggle favourite"
+                          color={blog.is_favorited ? 'primary' : 'default'}
+                          onClick={async () => {
+                            await toggleFavorite.mutateAsync(blog.slug);
+                            await refetch();
+                          }}
+                        >
+                          {blog.is_favorited ? <BookmarkAddedRoundedIcon /> : <BookmarkBorderRoundedIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
                   </Stack>
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                     By @{blog.author_name}
@@ -192,7 +263,7 @@ export default function ExplorePage() {
                         return;
                       }
                       await toggleLike.mutateAsync(blog.slug);
-                      refetch();
+                      await refetch();
                     }}
                   >
                     Toggle applause
@@ -205,8 +276,26 @@ export default function ExplorePage() {
               </motion.article>
             </Grid>
           ))}
+          {hasNextPage ? (
+            <Grid size={{ xs: 12 }}>
+              <Box ref={exploreLoadMoreRef} sx={{ height: 16 }} aria-hidden />
+            </Grid>
+          ) : null}
+          {isFetchingNextPage
+            ? Array.from({ length: 2 }).map((_, i) => (
+                <Grid size={{ xs: 12, md: 6 }} key={`ex-more-${String(i)}`}>
+                  <Skeleton variant="rounded" height={428} sx={{ borderRadius: 5 }} animation="wave" />
+                </Grid>
+              ))
+            : null}
         </Grid>
       )}
+
+      {!exploreLoading && !exploreError && explorePosts.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          Nothing matched that search yet. Adjust keywords or signal.
+        </Typography>
+      ) : null}
     </PageShell>
   );
 }

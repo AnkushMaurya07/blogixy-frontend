@@ -1,7 +1,10 @@
+import { Box } from '@mui/material';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactElement } from 'react';
 
 import AppNavbar from './components/AppNavbar';
+import MobileBottomNav, { MOBILE_BOTTOM_NAV_EXTRA_PX } from './components/MobileBottomNav';
+import { CreatePostModalProvider } from './context/CreatePostModalContext';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ExplorePage from './pages/ExplorePage';
@@ -20,8 +23,16 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
 
 export default function App() {
   return (
-    <>
+    <CreatePostModalProvider>
       <AppNavbar />
+      <Box
+        sx={{
+          pb: {
+            xs: `calc(${MOBILE_BOTTOM_NAV_EXTRA_PX}px + env(safe-area-inset-bottom, 0px))`,
+            md: 0,
+          },
+        }}
+      >
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
@@ -69,6 +80,8 @@ export default function App() {
           }
         />
       </Routes>
-    </>
+      </Box>
+      <MobileBottomNav />
+    </CreatePostModalProvider>
   );
 }

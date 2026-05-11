@@ -1,58 +1,46 @@
-import BoltRoundedIcon from '@mui/icons-material/BoltRounded';
 import CreateRoundedIcon from '@mui/icons-material/CreateRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
-import {
-  Box,
-  Button,
-  Divider,
-  FormControlLabel,
-  Grid,
-  LinearProgress,
-  MenuItem,
-  Paper,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { Box, Button, Divider, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import dayjs, { type Dayjs } from 'dayjs';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { useAiGenerateDraft, useAnalytics, useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
+import { useCreatePostModal } from '../context/CreatePostModalContext';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+import { useAnalytics } from '../api/hooks';
+import DashboardPetMascot from '../components/DashboardPetMascot';
 import PageShell from '../components/PageShell';
 
 export default function DashboardPage() {
   const theme = useTheme();
-  const [form, setForm] = useState({ title: '', content: '', is_published: true });
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [shareUrl, setShareUrl] = useState('');
-  const [aiPrompt, setAiPrompt] = useState('');
-  const createBlogMutation = useCreateBlog();
-  const uploadMediaMutation = useUploadBlogMedia();
-  const shareMutation = useCreateShareLink();
+  const { openCreatePostModal } = useCreatePostModal();
+  const [calendarDay, setCalendarDay] = useState<Dayjs | null>(() => dayjs());
   const analyticsQuery = useAnalytics();
-  const aiGenerateMutation = useAiGenerateDraft();
 
   const totals = analyticsQuery.data as { total_posts: number; total_views: number; total_likes: number } | undefined;
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const createdBlog = await createBlogMutation.mutateAsync(form);
-    if (mediaFile) {
-      await uploadMediaMutation.mutateAsync({
-        blogId: createdBlog.id,
-        file: mediaFile,
-        mediaType,
-      });
-    }
-    const share = await shareMutation.mutateAsync(createdBlog.slug);
-    setShareUrl(share.public_url);
-    setForm({ title: '', content: '', is_published: true });
-    setMediaFile(null);
-  };
+  const chartData = useMemo(
+    () => [
+      { name: 'Posts', value: totals?.total_posts ?? 0 },
+      { name: 'Views', value: totals?.total_views ?? 0 },
+      { name: 'Likes', value: totals?.total_likes ?? 0 },
+    ],
+    [totals?.total_likes, totals?.total_posts, totals?.total_views],
+  );
 
   return (
     <PageShell>
@@ -70,176 +58,183 @@ export default function DashboardPage() {
           </Typography>
         </Box>
 
-        <Grid container spacing={3}>
-          {([
-            {
-              icon: <CreateRoundedIcon />,
-              label: 'My posts published',
-              valueKey: 'total_posts' as const,
-              subtitle: 'Active inventory',
-            },
-            {
-              icon: <InsightsRoundedIcon />,
-              label: 'Audience views captured',
-              valueKey: 'total_views' as const,
-              subtitle: 'Cumulative glare',
-            },
-            {
-              icon: <FavoriteRoundedIcon />,
-              label: 'Likes collected',
-              valueKey: 'total_likes' as const,
-              subtitle: 'Applause signal',
-            },
-          ] as const).map((card) => {
-            const numeric = totals ? totals[card.valueKey] : undefined;
-            return (
-              <Grid size={{ xs: 12, md: 4 }} key={card.label}>
-                <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.25 }}>
-                  <Paper
-                    sx={{
-                      p: { xs: 2.75, md: 3 },
-                      borderRadius: 4,
-                      minHeight: 190,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1.75,
-                    }}
-                  >
-                    <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                      <Box
+        <Grid container spacing={3} sx={{ alignItems: 'stretch' }}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Grid container spacing={3}>
+              {([
+                {
+                  icon: <CreateRoundedIcon />,
+                  label: 'My posts published',
+                  valueKey: 'total_posts' as const,
+                  subtitle: 'Active inventory',
+                },
+                {
+                  icon: <InsightsRoundedIcon />,
+                  label: 'Audience views captured',
+                  valueKey: 'total_views' as const,
+                  subtitle: 'Cumulative glare',
+                },
+                {
+                  icon: <FavoriteRoundedIcon />,
+                  label: 'Likes collected',
+                  valueKey: 'total_likes' as const,
+                  subtitle: 'Applause signal',
+                },
+              ] as const).map((card) => {
+                const numeric = totals ? totals[card.valueKey] : undefined;
+                return (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={card.label}>
+                    <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.25 }}>
+                      <Paper
                         sx={{
-                          width: 52,
-                          height: 52,
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          color: theme.palette.primary.main,
-                          display: 'grid',
-                          placeItems: 'center',
+                          p: { xs: 2.75, md: 3 },
+                          borderRadius: 4,
+                          minHeight: 190,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1.75,
+                          height: '100%',
                         }}
                       >
-                        {card.icon}
-                      </Box>
-                      <Typography variant="caption" sx={{ letterSpacing: 1.35, fontWeight: 700 }} color="text.secondary">
-                        {card.subtitle}
-                      </Typography>
-                    </Stack>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {analyticsQuery.isLoading ? '…' : (numeric ?? 0).toLocaleString()}
-                    </Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      {card.label}
-                    </Typography>
-                    <LinearProgress
-                      variant={typeof numeric === 'number' ? 'determinate' : 'indeterminate'}
-                      value={numeric ? Math.min(100, (numeric % 180) || 62) : 25}
-                      sx={{ mt: 'auto', height: 10, borderRadius: 999 }}
+                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                          <Box
+                            sx={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 2,
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: theme.palette.primary.main,
+                              display: 'grid',
+                              placeItems: 'center',
+                            }}
+                          >
+                            {card.icon}
+                          </Box>
+                          <Typography variant="caption" sx={{ letterSpacing: 1.35, fontWeight: 700 }} color="text.secondary">
+                            {card.subtitle}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                          {analyticsQuery.isLoading ? '…' : (numeric ?? 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {card.label}
+                        </Typography>
+                        <LinearProgress
+                          variant={typeof numeric === 'number' ? 'determinate' : 'indeterminate'}
+                          value={numeric ? Math.min(100, (numeric % 180) || 62) : 25}
+                          sx={{ mt: 'auto', height: 10, borderRadius: 999 }}
+                        />
+                      </Paper>
+                    </motion.div>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                height: '100%',
+                minHeight: { xs: 420, md: 460 },
+                display: 'flex',
+                flexDirection: 'column',
+                p: { xs: 2, md: 2.5 },
+                borderRadius: 4,
+                border: (t) => `1px solid ${alpha(t.palette.divider, 0.12)}`,
+                background: (t) =>
+                  t.palette.mode === 'light'
+                    ? `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.06)} 0%, ${alpha(t.palette.background.paper, 1)} 42%, ${alpha(t.palette.secondary.main, 0.04)} 100%)`
+                    : `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.12)} 0%, ${alpha(t.palette.background.paper, 0.98)} 45%, ${alpha('#1e293b', 0.5)} 100%)`,
+              }}
+            >
+              <DashboardPetMascot />
+            </Paper>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Paper sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                Audience snapshot
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                Live totals from your posts — same numbers as the cards above, shown as a quick comparison.
+              </Typography>
+              <Box sx={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 6, right: 8, left: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.9)} vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
+                    <YAxis tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} allowDecimals={false} />
+                    <RechartsTooltip
+                      cursor={{ fill: alpha(theme.palette.primary.main, 0.06) }}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                        backgroundColor: theme.palette.background.paper,
+                      }}
                     />
-                  </Paper>
-                </motion.div>
-              </Grid>
-            );
-          })}
+                    <Bar dataKey="value" fill={theme.palette.primary.main} radius={[8, 8, 0, 0]} maxBarSize={56} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Paper sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 4, height: '100%' }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+                  Editorial calendar
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                  Mark a day you want to publish next — native reminders can plug in later.
+                </Typography>
+                <DateCalendar value={calendarDay} onChange={(v) => setCalendarDay(v)} />
+              </Paper>
+            </LocalizationProvider>
+          </Grid>
         </Grid>
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, xl: 8 }}>
-            <Paper sx={{ borderRadius: 4, overflow: 'hidden' }}>
-              <Stack direction="row" spacing={2} sx={{ px: { xs: 2.5, md: 4 }, pt: { xs: 3, md: 4 }, pb: 2, alignItems: 'center' }}>
-                <BoltRoundedIcon color="primary" />
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    Editor
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Compose with intent—media payloads route through your CDN plan later.
-                  </Typography>
-                </Box>
-              </Stack>
-              <Divider />
-              <Box component="form" onSubmit={submit} sx={{ p: { xs: 3, md: 4 }, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                  <TextField
-                    fullWidth
-                    label="AI prompt"
-                    variant="filled"
-                    placeholder="Generate a draft on growth storytelling for SaaS..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                  />
-                  <Button
-                    variant="outlined"
-                    onClick={async () => {
-                      if (!aiPrompt.trim()) return;
-                      const draft = await aiGenerateMutation.mutateAsync({ prompt: aiPrompt, length: 'medium' });
-                      setForm((prev) => ({
-                        ...prev,
-                        title: draft.title ?? prev.title,
-                        content: draft.content ?? prev.content,
-                      }));
-                    }}
-                  >
-                    Generate
-                  </Button>
-                </Stack>
-                <TextField
-                  label="Title"
-                  variant="filled"
-                  fullWidth
-                  value={form.title}
-                  placeholder="Operational clarity or poetic chaos"
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                />
-                <TextField label="Essay body" variant="filled" multiline minRows={6} placeholder="Sharpen with structure…" fullWidth value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-                <FormControlLabel
-                  label="Immediate publish?"
-                  sx={{ '& .MuiFormControlLabel-label': { typography: 'body2', fontWeight: 620 } }}
-                  control={
-                    <Switch checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} />
-                  }
-                />
-                <TextField
-                  select
-                  variant="filled"
-                  label="Lead media type"
-                  helperText={mediaFile ? mediaFile.name : 'Optional — attaches after creation'}
-                  value={mediaType}
-                  onChange={(e) => setMediaType(e.target.value as 'image' | 'video')}
+            <Paper sx={{ borderRadius: 4, p: { xs: 3, md: 4 } }}>
+              <Stack spacing={2}>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Compose
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+                  Create posts in a modal with AI drafts, attachments, publish or draft modes, automatic share links, and success confirmations — so you can stay on whatever page you are on.
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<CreateRoundedIcon />}
+                  onClick={() => openCreatePostModal()}
+                  sx={{ alignSelf: 'flex-start' }}
                 >
-                  <MenuItem value="image">Image hero</MenuItem>
-                  <MenuItem value="video">Video embed</MenuItem>
-                </TextField>
-                <Button variant="outlined" component="label">
-                  Attach media ({mediaType})
-                  <input hidden type="file" onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)} />
+                  Create post
                 </Button>
-                <Button variant="contained" size="large" type="submit" startIcon={<CreateRoundedIcon />}>
-                  Forge story
-                </Button>
-              </Box>
-              {shareUrl ? (
-                <Box sx={(t) => ({ px: { xs: 3, md: 4 }, py: { xs: 2, md: 3 }, bgcolor: alpha(t.palette.success.main, 0.06) })}>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                    Share permalink
-                  </Typography>
-                  <Typography variant="body2" sx={{ overflowWrap: 'anywhere', fontFamily: theme.typography.fontFamily }}>
-                    <a href={shareUrl}>{shareUrl}</a>
-                  </Typography>
-                </Box>
-              ) : null}
+              </Stack>
             </Paper>
           </Grid>
           <Grid size={{ xs: 12, xl: 4 }}>
             <Paper sx={{ p: 3.5, borderRadius: 4, mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 740, mb: 1 }}>
-                Graph roadmap
+                Momentum tips
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Dedicated GraphQL façade will expose deeper cohort metrics (cohort retention + surface-level virality)—for now REST
-                analytics stay crisp and deterministic.
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.65 }}>
+                Stack a short hook in the first two lines, add one strong visual, and publish on the day you picked in the calendar.
+                Deeper cohort charts can land when we wire time-series analytics.
               </Typography>
               <Divider sx={{ my: 2 }} />
               <Typography variant="caption" color="text.secondary">
-                Upcoming overlays: anomaly detection on engagement spikes & automated digest exports.
+                Selected plan date:{' '}
+                <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {calendarDay ? calendarDay.format('MMM D, YYYY') : '—'}
+                </Box>
               </Typography>
             </Paper>
           </Grid>
