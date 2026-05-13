@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
-import { blogCoverImageUrl, userAvatarUrl } from '../api/mediaUrl';
+import { blogCoverImageUrl, firstBlogImageUrl, firstBlogVideoUrl, userAvatarUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 function formatRelativeTime(iso?: string): string {
@@ -37,11 +37,17 @@ type FeedPostProps = {
 export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDivider = true }: FeedPostProps) {
   const theme = useTheme();
   const [likeBurst, setLikeBurst] = useState(false);
+  const [liked, setLiked] = useState(Boolean(blog.is_liked));
   const [favorited, setFavorited] = useState(Boolean(blog.is_favorited));
+  useEffect(() => {
+    setLiked(Boolean(blog.is_liked));
+  }, [blog.id, blog.is_liked]);
   useEffect(() => {
     setFavorited(Boolean(blog.is_favorited));
   }, [blog.id, blog.is_favorited]);
   const cover = blogCoverImageUrl(blog, { width: 900, height: 500 });
+  const videoSrc = firstBlogVideoUrl(blog.media_items);
+  const imageSrc = firstBlogImageUrl(blog.media_items);
   const relative = formatRelativeTime(blog.created_at);
   const avatarSrc = userAvatarUrl({
     id: blog.author,
@@ -51,9 +57,10 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
 
   const handleLike = () => {
     if (!onLikeToggle) return;
+    setLiked((v) => !v);
     setLikeBurst(true);
     window.setTimeout(() => setLikeBurst(false), 420);
-    onLikeToggle();
+    void onLikeToggle();
   };
 
   const handleFavorite = () => {
@@ -68,7 +75,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
       initial={{ opacity: 0, y: 12 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-5%' }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as const }}
     >
       <Paper
         elevation={0}
@@ -103,7 +110,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
               '&:hover': { opacity: 0.92 },
             }}
           >
-            {blog.author_name.slice(0, 1).toUpperCase()}
+            {blog.author_name?.slice(0, 1).toUpperCase() ?? '?'}
           </Avatar>
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -119,7 +126,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
                   '&:hover': { textDecoration: 'underline' },
                 }}
               >
-                @{blog.author_name}
+                @{blog.author_name ?? 'author'}
               </Typography>
               {relative ? (
                 <Typography variant="caption" color="text.secondary" component="span">
@@ -192,19 +199,36 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
                   bgcolor: alpha(theme.palette.common.black, theme.palette.mode === 'light' ? 0.04 : 0.25),
                 }}
               >
-                <Box
-                  component="img"
-                  loading="lazy"
-                  decoding="async"
-                  src={cover}
-                  alt=""
-                  sx={{
-                    width: '100%',
-                    display: 'block',
-                    objectFit: 'cover',
-                    maxHeight: { xs: 280, sm: 360 },
-                  }}
-                />
+                {videoSrc ? (
+                  <Box
+                    component="video"
+                    src={videoSrc}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    sx={{
+                      width: '100%',
+                      display: 'block',
+                      maxHeight: { xs: 280, sm: 360 },
+                      objectFit: 'cover',
+                      bgcolor: 'common.black',
+                    }}
+                  />
+                ) : (
+                  <Box
+                    component="img"
+                    loading="lazy"
+                    decoding="async"
+                    src={imageSrc ?? cover}
+                    alt=""
+                    sx={{
+                      width: '100%',
+                      display: 'block',
+                      objectFit: 'cover',
+                      maxHeight: { xs: 280, sm: 360 },
+                    }}
+                  />
+                )}
               </Box>
             </RouterLink>
 
@@ -267,10 +291,10 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
                   size="small"
                   onClick={handleLike}
                   disabled={!onLikeToggle}
-                  aria-label="Like post"
+                  aria-label={liked ? 'Unlike post' : 'Like post'}
                   sx={{
                     borderRadius: 99,
-                    color: likeBurst ? 'error.main' : 'text.secondary',
+                    color: liked || likeBurst ? 'error.main' : 'text.secondary',
                     transition: 'transform 0.2s ease',
                     transform: likeBurst ? 'scale(1.15)' : 'scale(1)',
                     '&:hover': {
@@ -279,7 +303,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
                     },
                   }}
                 >
-                  {likeBurst ? (
+                  {liked || likeBurst ? (
                     <FavoriteRoundedIcon sx={{ fontSize: 20 }} />
                   ) : (
                     <FavoriteBorderRoundedIcon sx={{ fontSize: 20 }} />

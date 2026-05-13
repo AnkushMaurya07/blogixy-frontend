@@ -5,12 +5,14 @@ import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { useState } from 'react';
 
 import { useBlogComments, useCreateComment } from '../api/hooks';
+import { useAppSelector } from '../features/auth/hooks';
 
 type BlogCommentsPanelProps = {
   slug: string;
 };
 
 export default function BlogCommentsPanel({ slug }: BlogCommentsPanelProps) {
+  const token = useAppSelector((s) => s.auth.accessToken);
   const [content, setContent] = useState('');
   const commentsQuery = useBlogComments(slug);
   const createComment = useCreateComment(slug);
@@ -67,23 +69,25 @@ export default function BlogCommentsPanel({ slug }: BlogCommentsPanelProps) {
           size="small"
           variant="filled"
           label="Thoughts?"
-          placeholder="Drop a nuanced take"
+          placeholder={token ? 'Drop a nuanced take' : 'Sign in to comment'}
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          disabled={!token}
         />
         <Button
           variant="contained"
           endIcon={<SendRoundedIcon />}
+          disabled={!token || createComment.isPending}
           onClick={async () => {
             if (!content.trim()) {
               return;
             }
-            await createComment.mutateAsync(content);
+            await createComment.mutateAsync(content.trim());
             setContent('');
           }}
           sx={{ minWidth: 140 }}
         >
-          Publish
+          Post comment
         </Button>
       </Stack>
     </Box>

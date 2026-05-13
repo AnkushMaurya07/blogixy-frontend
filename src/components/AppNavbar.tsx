@@ -3,6 +3,11 @@ import {
   Badge,
   Box,
   Button,
+  ButtonGroup,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -19,24 +24,28 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import CreateRoundedIcon from '@mui/icons-material/CreateRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import ExploreRoundedIcon from '@mui/icons-material/ExploreRounded';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
-import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import type { ReactElement } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { RiQuillPenLine } from 'react-icons/ri';
 
 import { userAvatarUrl } from '../api/mediaUrl';
-import { useConversations, useNotifications, useProfile } from '../api/hooks';
+import { prefetchExploreDefault, useConversations, useNotifications, useProfile } from '../api/hooks';
+import { getNotificationVisual, getToneMain } from '../utils/notificationVisual';
 import type { ConversationSummary, UserProfile } from '../api/types';
 import { useCreatePostModal } from '../context/CreatePostModalContext';
 import { useAppDispatch, useAppSelector } from '../features/auth/hooks';
@@ -46,13 +55,17 @@ export default function AppNavbar() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const token = useAppSelector((s) => s.auth.accessToken);
   const dispatch = useAppDispatch();
   const { openCreatePostModal } = useCreatePostModal();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const shellMaxWidth = useAppSelector((s) => s.ui.shellMaxWidth);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
+  const [writeMenuAnchor, setWriteMenuAnchor] = useState<null | HTMLElement>(null);
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<null | HTMLElement>(null);
   const [navSearchQuery, setNavSearchQuery] = useState('');
 
@@ -66,6 +79,17 @@ export default function AppNavbar() {
     const q = navSearchQuery.trim();
     navigate(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
   };
+
+  const warmExploreRoute = () => {
+    void prefetchExploreDefault(queryClient);
+    void import('../pages/ExplorePage');
+  };
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const id = window.setTimeout(() => mobileSearchInputRef.current?.focus(), 50);
+    return () => window.clearTimeout(id);
+  }, [mobileSearchOpen]);
 
   const { data: notifications } = useNotifications();
   const profileQuery = useProfile();
@@ -102,7 +126,6 @@ export default function AppNavbar() {
   type NavSpec = { label: string; to: string; auth?: boolean; icon: ReactElement };
 
   const NAV_LINKS: NavSpec[] = [
-    { label: 'Home', to: '/', icon: <HomeRoundedIcon fontSize="small" /> },
     { label: 'Explore', to: '/explore', icon: <ExploreRoundedIcon fontSize="small" /> },
     { label: 'Dashboard', to: '/dashboard', auth: true, icon: <DashboardRoundedIcon fontSize="small" /> },
     { label: 'Settings', to: '/settings', icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -118,6 +141,7 @@ export default function AppNavbar() {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '8px',
+    minHeight: 48,
     px: '14px',
     py: '9px',
     borderRadius: '12px',
@@ -138,7 +162,8 @@ export default function AppNavbar() {
           : 'none',
   });
 
-  const recentNotifications = (notifications as { id: number; title: string; message: string; is_read: boolean }[] | undefined)?.slice(0, 5) ?? [];
+  type NotifRow = { id: number; title: string; message: string; is_read: boolean; notification_type?: string };
+  const recentNotifications = (notifications as NotifRow[] | undefined)?.slice(0, 5) ?? [];
   const me = profileQuery.data as UserProfile | undefined;
   const avatarSrc =
     me && me.username
@@ -222,13 +247,20 @@ export default function AppNavbar() {
 
   const renderDesktopIconNav = () =>
     barLinks.map((link) => (
-      <motion.div key={link.to} whileHover={{ y: -1 }} transition={{ duration: 0.14 }} style={{ display: 'inline-flex' }}>
+      <motion.div
+        key={link.to}
+        whileHover={{ y: -2, scale: 1.05 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+        style={{ display: 'inline-flex' }}
+      >
         <Tooltip title={link.label} arrow enterDelay={300}>
           <Box component="span" sx={{ display: 'inline-flex' }}>
             <NavLink
               to={link.to}
               aria-label={link.label}
               onClick={closeDrawer}
+              onMouseEnter={link.to === '/explore' ? warmExploreRoute : undefined}
               style={{ textDecoration: 'none', display: 'inline-flex' }}
             >
               {({ isActive }) => <Box component="span" sx={iconNavTargetSx(isActive)}>{link.icon}</Box>}
@@ -238,19 +270,27 @@ export default function AppNavbar() {
       </motion.div>
     ));
 
-  const renderDrawerLinks = () =>
-    drawerPrimaryLinks.map((link) => (
-      <motion.div key={link.to} whileHover={{ x: 2 }} transition={{ duration: 0.14 }}>
-        <NavLink to={link.to} onClick={closeDrawer} style={{ textDecoration: 'none' }}>
-          {({ isActive }) => (
-            <Box component="span" sx={{ ...navSx(isActive) }}>
-              {link.icon}
-              {link.label}
-            </Box>
-          )}
-        </NavLink>
-      </motion.div>
-    ));
+  const renderDrawerLinks = () => (
+    <Stack spacing={0.75} sx={{ width: '100%' }}>
+      {drawerPrimaryLinks.map((link) => (
+        <motion.div key={link.to} whileHover={{ x: 3 }} whileTap={{ scale: 0.99 }} transition={{ type: 'spring', stiffness: 380, damping: 26 }}>
+          <NavLink
+            to={link.to}
+            onClick={closeDrawer}
+            onMouseEnter={link.to === '/explore' ? warmExploreRoute : undefined}
+            style={{ textDecoration: 'none', display: 'block' }}
+          >
+            {({ isActive }) => (
+              <Box component="span" sx={{ ...navSx(isActive), width: '100%', boxSizing: 'border-box' }}>
+                {link.icon}
+                {link.label}
+              </Box>
+            )}
+          </NavLink>
+        </motion.div>
+      ))}
+    </Stack>
+  );
 
   const messagesIconEl =
     messageUnreadCount > 0 ? (
@@ -341,6 +381,20 @@ export default function AppNavbar() {
               </Box>
             </Box>
 
+            {!isMdUp ? (
+              <Tooltip title="Search posts" arrow enterDelay={250}>
+                <IconButton
+                  aria-label="Open search"
+                  color="inherit"
+                  size="medium"
+                  onClick={() => setMobileSearchOpen(true)}
+                  sx={{ flexShrink: 0 }}
+                >
+                  <SearchRoundedIcon />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+
             {isMdUp ? (
               <TextField
                 size="small"
@@ -425,47 +479,124 @@ export default function AppNavbar() {
                 {token ? (
                   <>
                     <Tooltip title="Messages" arrow enterDelay={300}>
-                      <IconButton
-                        aria-label="Messages"
-                        component={Link}
-                        to="/messages"
-                        color="inherit"
-                        size="medium"
-                        sx={{ border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`, width: 42, height: 42 }}
-                      >
-                        {messagesIconEl}
-                      </IconButton>
+                      <Box component={motion.div} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} transition={{ type: 'spring', stiffness: 400, damping: 22 }} sx={{ display: 'inline-flex' }}>
+                        <IconButton
+                          aria-label="Messages"
+                          component={Link}
+                          to="/messages"
+                          color="inherit"
+                          size="medium"
+                          sx={{ border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`, width: 42, height: 42 }}
+                        >
+                          {messagesIconEl}
+                        </IconButton>
+                      </Box>
                     </Tooltip>
                     <Tooltip title="Notifications" arrow enterDelay={300}>
-                      <IconButton
-                        aria-label="Notifications"
-                        color="inherit"
-                        size="medium"
-                        onClick={(e) => setNotifAnchorEl(e.currentTarget)}
-                        sx={{ border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`, width: 42, height: 42 }}
-                      >
-                        {notificationsIconEl}
-                      </IconButton>
+                      <Box component={motion.div} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} transition={{ type: 'spring', stiffness: 400, damping: 22 }} sx={{ display: 'inline-flex' }}>
+                        <IconButton
+                          aria-label="Notifications"
+                          color="inherit"
+                          size="medium"
+                          onClick={(e) => setNotifAnchorEl(e.currentTarget)}
+                          sx={{ border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`, width: 42, height: 42 }}
+                        >
+                          {notificationsIconEl}
+                        </IconButton>
+                      </Box>
                     </Tooltip>
-                    <Tooltip title="Create post" arrow enterDelay={300}>
-                      <IconButton
-                        aria-label="Create post"
-                        color="primary"
-                        size="medium"
-                        onClick={() => openCreatePostModal()}
-                        sx={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: '12px',
-                          bgcolor: theme.palette.primary.main,
-                          color: theme.palette.primary.contrastText,
-                          boxShadow: `0 10px 28px ${alpha(theme.palette.primary.main, 0.35)}`,
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.9 : 0.82) },
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignSelf: 'center',
+                        borderRadius: '14px',
+                        p: '2px',
+                        overflow: 'hidden',
+                        boxShadow: `0 10px 28px ${alpha(theme.palette.primary.main, 0.35)}`,
+                        background: `repeating-linear-gradient(
+                          90deg,
+                          ${alpha(theme.palette.primary.contrastText, 0.88)} 0px 5px,
+                          ${theme.palette.primary.main} 5px 12px
+                        )`,
+                        backgroundSize: '24px 100%',
+                        animation: 'navCreatePostDash 0.8s linear infinite',
+                        '@keyframes navCreatePostDash': {
+                          '0%': { backgroundPosition: '0 0' },
+                          '100%': { backgroundPosition: '24px 0' },
+                        },
+                        '@media (prefers-reduced-motion: reduce)': {
+                          animation: 'none',
+                          backgroundPosition: '0 0',
+                        },
+                      }}
+                    >
+                    <ButtonGroup
+                      variant="contained"
+                      color="primary"
+                      sx={{
+                        '& .MuiButton-root': { borderRadius: 0 },
+                        '& .MuiButtonGroup-firstButton': { borderRadius: '12px 0 0 12px' },
+                        '& .MuiButtonGroup-lastButton': { borderRadius: '0 12px 12px 0' },
+                      }}
+                    >
+                      <Tooltip title="Create post" arrow enterDelay={300}>
+                        <Button
+                          aria-label="Create post"
+                          onClick={() => openCreatePostModal()}
+                          sx={{
+                            px: 1.25,
+                            minWidth: 0,
+                            textTransform: 'none',
+                            fontWeight: 700,
+                          }}
+                          startIcon={<RiQuillPenLine aria-hidden style={{ fontSize: 20 }} />}
+                        >
+                          Create
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="More" arrow enterDelay={300}>
+                        <Button
+                          aria-haspopup="menu"
+                          aria-expanded={Boolean(writeMenuAnchor)}
+                          aria-label="Open create menu"
+                          size="small"
+                          onClick={(e) => setWriteMenuAnchor(e.currentTarget)}
+                          sx={{
+                            minWidth: 40,
+                            px: 0.5,
+                            borderLeft: `1px solid ${alpha(theme.palette.primary.contrastText, 0.28)}`,
+                          }}
+                        >
+                          <KeyboardArrowDownRoundedIcon />
+                        </Button>
+                      </Tooltip>
+                    </ButtonGroup>
+                    </Box>
+                    <Menu
+                      anchorEl={writeMenuAnchor}
+                      open={Boolean(writeMenuAnchor)}
+                      onClose={() => setWriteMenuAnchor(null)}
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                      transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    >
+                      <MenuItem
+                        onClick={() => {
+                          openCreatePostModal();
+                          setWriteMenuAnchor(null);
                         }}
                       >
-                        <RiQuillPenLine aria-hidden fontSize={22} />
-                      </IconButton>
-                    </Tooltip>
+                        <ListItemIcon>
+                          <CreateRoundedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Create post</ListItemText>
+                      </MenuItem>
+                      <MenuItem component={Link} to="/drafts" onClick={() => setWriteMenuAnchor(null)}>
+                        <ListItemIcon>
+                          <EditNoteRoundedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Draft posts</ListItemText>
+                      </MenuItem>
+                    </Menu>
                     {profileTriggerButton}
                   </>
                 ) : null}
@@ -484,61 +615,23 @@ export default function AppNavbar() {
         <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
           Navigate
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search posts…"
-            value={navSearchQuery}
-            onChange={(e) => setNavSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                submitNavSearch();
-                closeDrawer();
-              }
-            }}
-            aria-label="Search posts"
-            variant="outlined"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => {
-              submitNavSearch();
-              closeDrawer();
-            }}
-            sx={{ flexShrink: 0 }}
-          >
-            Go
-          </Button>
-        </Stack>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>{renderDrawerLinks()}</Box>
+        {renderDrawerLinks()}
         {token ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
               Inbox & alerts
             </Typography>
-            <NavLink to="/messages" onClick={closeDrawer} style={{ textDecoration: 'none' }}>
+            <NavLink to="/messages" onClick={closeDrawer} style={{ textDecoration: 'none', display: 'block' }}>
               {({ isActive }) => (
-                <Box component="span" sx={{ ...navSx(isActive) }}>
+                <Box component="span" sx={{ ...navSx(isActive), width: '100%', boxSizing: 'border-box' }}>
                   <ForumRoundedIcon fontSize="small" />
                   Messages
                 </Box>
               )}
             </NavLink>
-            <NavLink to="/notifications" onClick={closeDrawer} style={{ textDecoration: 'none' }}>
+            <NavLink to="/notifications" onClick={closeDrawer} style={{ textDecoration: 'none', display: 'block' }}>
               {({ isActive }) => (
-                <Box component="span" sx={{ ...navSx(isActive) }}>
+                <Box component="span" sx={{ ...navSx(isActive), width: '100%', boxSizing: 'border-box' }}>
                   <NotificationsRoundedIcon fontSize="small" />
                   Notifications
                 </Box>
@@ -568,6 +661,53 @@ export default function AppNavbar() {
           </Button>
         ) : null}
       </Drawer>
+
+      <Dialog open={mobileSearchOpen} onClose={() => setMobileSearchOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Search posts</DialogTitle>
+        <DialogContent>
+          <TextField
+            inputRef={mobileSearchInputRef}
+            fullWidth
+            placeholder="Keywords, moods, authors…"
+            value={navSearchQuery}
+            onChange={(e) => setNavSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                submitNavSearch();
+                setMobileSearchOpen(false);
+              }
+            }}
+            margin="dense"
+            variant="outlined"
+            autoComplete="off"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button color="inherit" onClick={() => setMobileSearchOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              submitNavSearch();
+              setMobileSearchOpen(false);
+            }}
+          >
+            Search
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Menu
         anchorEl={notifAnchorEl}
         open={Boolean(notifAnchorEl)}
@@ -579,20 +719,53 @@ export default function AppNavbar() {
             <ListItemText primary="No recent notifications" secondary="You're all caught up." />
           </MenuItem>
         ) : (
-          recentNotifications.map((item) => (
-            <MenuItem
-              key={item.id}
-              component={Link}
-              to="/notifications"
-              onClick={() => setNotifAnchorEl(null)}
-            >
-              <ListItemText
-                primary={item.title}
-                secondary={item.message}
-
-              />
-            </MenuItem>
-          ))
+          recentNotifications.map((item) => {
+            const { Icon, tone } = getNotificationVisual(item);
+            const tc = getToneMain(theme, tone);
+            return (
+              <MenuItem
+                key={item.id}
+                component={Link}
+                to="/notifications"
+                onClick={() => setNotifAnchorEl(null)}
+                sx={{ alignItems: 'flex-start', py: 1.25, gap: 1 }}
+              >
+                <ListItemIcon sx={{ minWidth: 44, mt: 0.35 }}>
+                  <Box
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(tc, 0.14),
+                      color: tc,
+                    }}
+                  >
+                    <Icon sx={{ fontSize: 22 }} />
+                  </Box>
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.title}
+                  secondary={item.message}
+                  slotProps={{
+                    primary: {
+                      sx: { fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                    },
+                    secondary: {
+                      sx: {
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        whiteSpace: 'normal',
+                      },
+                    },
+                  }}
+                />
+              </MenuItem>
+            );
+          })
         )}
         <Divider />
         <MenuItem component={Link} to="/notifications" onClick={() => setNotifAnchorEl(null)}>

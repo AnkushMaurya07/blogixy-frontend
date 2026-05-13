@@ -4,10 +4,11 @@ import ExploreRoundedIcon from '@mui/icons-material/ExploreRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import { Badge, BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
+import CreateRoundedIcon from '@mui/icons-material/CreateRounded';
+import { Badge, BottomNavigation, BottomNavigationAction, Menu, MenuItem, Paper } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { useConversations } from '../api/hooks';
@@ -25,6 +26,7 @@ export default function MobileBottomNav() {
   const token = useAppSelector((s) => s.auth.accessToken);
   const { openCreatePostModal } = useCreatePostModal();
   const { data: conversations } = useConversations();
+  const [writeMenuAnchor, setWriteMenuAnchor] = useState<null | HTMLElement>(null);
 
   const messageUnread = useMemo(
     () =>
@@ -44,6 +46,7 @@ export default function MobileBottomNav() {
       return false;
     }
     if (p.startsWith('/dashboard')) return 2;
+    if (p.startsWith('/drafts')) return -1;
     if (p.startsWith('/messages')) return 3;
     if (p.startsWith('/profile') || p.startsWith('/users/')) return 4;
     return false;
@@ -126,7 +129,32 @@ export default function MobileBottomNav() {
             component={Link}
             to="/explore"
           />
-          <BottomNavigationAction label="Write" icon={<EditNoteRoundedIcon />} onClick={() => openCreatePostModal()} />
+          <BottomNavigationAction
+            label="Write"
+            icon={<EditNoteRoundedIcon />}
+            onClick={(e) => setWriteMenuAnchor(e.currentTarget)}
+          />
+          <Menu
+            anchorEl={writeMenuAnchor}
+            open={Boolean(writeMenuAnchor)}
+            onClose={() => setWriteMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <MenuItem
+              onClick={() => {
+                openCreatePostModal();
+                setWriteMenuAnchor(null);
+              }}
+            >
+              <CreateRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+              Create post
+            </MenuItem>
+            <MenuItem component={Link} to="/drafts" onClick={() => setWriteMenuAnchor(null)}>
+              <EditNoteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+              Draft posts
+            </MenuItem>
+          </Menu>
           <BottomNavigationAction label="Messages" icon={messagesIcon} component={Link} to="/messages" />
           <BottomNavigationAction
             label="You"

@@ -1,11 +1,13 @@
 import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
 import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
-import ModeCommentRoundedIcon from '@mui/icons-material/ModeCommentRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   Box,
   Button,
@@ -15,6 +17,7 @@ import {
   IconButton,
   InputAdornment,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -28,12 +31,13 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import BlogCommentsPanel from '../components/BlogCommentsPanel';
 import PageShell from '../components/PageShell';
 import { useInfiniteExploreBlogs, useToggleFavorite, useToggleLike } from '../api/hooks';
+import { firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 import { useAppSelector } from '../features/auth/hooks';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -68,7 +72,14 @@ export default function ExplorePage() {
   const toggleLike = useToggleLike();
   const toggleFavorite = useToggleFavorite();
 
-  const explorePosts = useMemo(() => explorePages?.pages.flatMap((p) => p.results) ?? [], [explorePages]);
+  const explorePosts = useMemo(
+    () => (explorePages?.pages ?? []).flatMap((p) => p.results ?? []),
+    [explorePages],
+  );
+  /** Keeps the previous grid visible while React Query refetches (concurrent UI). */
+  const deferredExplorePosts = useDeferredValue(explorePosts);
+  const listForGrid = deferredExplorePosts;
+  const showExploreRefetchBar = isFetching && !exploreLoading && explorePosts.length > 0;
 
   const onSortChange = (e: SelectChangeEvent<'ranking' | 'latest'>) => {
     setSort(e.target.value as 'ranking' | 'latest');
@@ -199,8 +210,16 @@ export default function ExplorePage() {
           ))}
         </Grid>
       ) : (
-        <Grid container spacing={3}>
-          {explorePosts.map((blog: BlogPost, idx: number) => (
+        <>
+          {showExploreRefetchBar ? (
+            <LinearProgress
+              color="primary"
+              sx={{ mb: 2, height: 3, borderRadius: 99, maxWidth: '100%' }}
+              aria-label="Updating results"
+            />
+          ) : null}
+          <Grid container spacing={3}>
+          {listForGrid.map((blog: BlogPost, idx: number) => (
             <Grid size={{ xs: 12, md: 6 }} key={blog.id}>
               <motion.article
                 initial={{ opacity: 0, y: 12 }}
@@ -226,50 +245,91 @@ export default function ExplorePage() {
                         {blog.title}
                       </Box>
                     </Typography>
+                    {firstBlogVideoUrl(blog.media_items) ? (
+                      <Box
+                        component="video"
+                        src={firstBlogVideoUrl(blog.media_items)}
+                        controls
+                        muted
+                        playsInline
+                        preload="metadata"
+                        sx={{
+                          width: '100%',
+                          maxHeight: 200,
+                          borderRadius: 2,
+                          bgcolor: 'common.black',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    ) : firstBlogImageUrl(blog.media_items) ? (
+                      <Box
+                        component="img"
+                        src={firstBlogImageUrl(blog.media_items)}
+                        alt=""
+                        loading="lazy"
+                        sx={{ width: '100%', maxHeight: 200, borderRadius: 2, objectFit: 'cover' }}
+                      />
+                    ) : null}
                     <Typography variant="body2" color="text.secondary" sx={{ minHeight: 72 }}>
                       {blog.content.slice(0, 220)}{blog.content.length > 220 ? '…' : ''}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center', '& .MuiChip-root': { borderRadius: 2 } }}>
-                    <Chip size="medium" variant="filled" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
-                    <Chip variant="filled" icon={<FavoriteBorderRoundedIcon />} label={`${blog.likes_count} likes`} />
-                    <Chip variant="filled" icon={<ModeCommentRoundedIcon />} label={`${blog.comments_count} comments`} />
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center', gap: 0.5 }}>
+                    <Chip size="small" variant="outlined" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      @{blog.author_name}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }} useFlexGap>
+                    <Tooltip title={token ? 'Open post and comments' : 'Sign in to interact'}>
+                      <Button
+                        component={Link}
+                        to={`/blogs/${blog.slug}`}
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ChatBubbleOutlineRoundedIcon />}
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                      >
+                        {blog.comments_count} comments
+                      </Button>
+                    </Tooltip>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', color: 'text.secondary', px: 0.5 }}>
+                      <VisibilityOutlinedIcon sx={{ fontSize: 20 }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {blog.view_count}
+                      </Typography>
+                    </Stack>
+                    <Tooltip title={token ? (blog.is_liked ? 'Unlike' : 'Like') : 'Sign in to like'}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={!token}
+                          onClick={() => toggleLike.mutate(blog.slug)}
+                          aria-label={blog.is_liked ? 'Unlike post' : 'Like post'}
+                          sx={{ color: blog.is_liked ? 'error.main' : 'text.secondary' }}
+                        >
+                          {blog.is_liked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 650, minWidth: 16 }}>
+                      {blog.likes_count}
+                    </Typography>
                     {token ? (
                       <Tooltip title={blog.is_favorited ? 'Remove from favourites' : 'Save to favourites'}>
                         <IconButton
                           size="small"
                           aria-label="Toggle favourite"
                           color={blog.is_favorited ? 'primary' : 'default'}
-                          onClick={async () => {
-                            await toggleFavorite.mutateAsync(blog.slug);
-                            await refetch();
-                          }}
+                          onClick={() => toggleFavorite.mutate(blog.slug)}
                         >
                           {blog.is_favorited ? <BookmarkAddedRoundedIcon /> : <BookmarkBorderRoundedIcon />}
                         </IconButton>
                       </Tooltip>
                     ) : null}
                   </Stack>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    By @{blog.author_name}
-                  </Typography>
-                  <Button
-                    sx={{ mt: 'auto', alignSelf: 'flex-start' }}
-                    variant="outlined"
-                    endIcon={<FavoriteBorderRoundedIcon />}
-                    disabled={!token}
-                    onClick={async () => {
-                      if (!token) {
-                        return;
-                      }
-                      await toggleLike.mutateAsync(blog.slug);
-                      await refetch();
-                    }}
-                  >
-                    Toggle applause
-                  </Button>
-                  <Button component={Link} to={`/blogs/${blog.slug}`} variant="text" size="small" sx={{ px: 0 }}>
-                    Open full blog
+                  <Button component={Link} to={`/blogs/${blog.slug}`} variant="contained" size="small" sx={{ mt: 'auto', alignSelf: 'flex-start' }}>
+                    Read full post
                   </Button>
                   <BlogCommentsPanel slug={blog.slug} />
                 </Paper>
@@ -289,6 +349,7 @@ export default function ExplorePage() {
               ))
             : null}
         </Grid>
+        </>
       )}
 
       {!exploreLoading && !exploreError && explorePosts.length === 0 ? (

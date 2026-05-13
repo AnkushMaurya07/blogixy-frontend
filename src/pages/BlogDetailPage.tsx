@@ -1,6 +1,7 @@
 import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
 import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import ShareRoundedIcon from '@mui/icons-material/ShareRounded';
@@ -16,7 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useCreateComment, useCreateShareLink, useSendBlogToUsers, useToggleFavorite, useToggleLike } from '../api/hooks';
@@ -59,11 +60,14 @@ export default function BlogDetailPage() {
 
   const blog = blogQuery.data as BlogPost | undefined;
   const comments = (commentsQuery.data as { id: number; user_name: string; content: string }[] | undefined) ?? [];
+  const [liked, setLiked] = useState(false);
+  useEffect(() => {
+    setLiked(Boolean(blog?.is_liked));
+  }, [blog?.id, blog?.is_liked]);
 
   const mediaItems = useMemo(() => blog?.media_items?.map((item) => ({ ...item, abs: absoluteMediaUrl(item.file) })) ?? [], [blog]);
-  const hasImageMedia = Boolean(
-    blog?.media_items?.some((m) => m.media_type === 'image'),
-  );
+  const hasImageMedia = Boolean(blog?.media_items?.some((m) => m.media_type === 'image'));
+  const firstVideoHero = mediaItems.find((m) => m.media_type === 'video');
 
   if (!blog) {
     return (
@@ -80,19 +84,36 @@ export default function BlogDetailPage() {
       </Button>
       <Paper sx={{ p: 0, overflow: 'hidden', borderRadius: 4 }}>
         {!hasImageMedia && (
-          <Box
-            component="img"
-            src={blogCoverImageUrl(blog, { width: 1200, height: 540 })}
-            alt=""
-            loading="eager"
-            decoding="async"
-            sx={{
-              width: '100%',
-              display: 'block',
-              maxHeight: { xs: 240, sm: 320 },
-              objectFit: 'cover',
-            }}
-          />
+          firstVideoHero ? (
+            <Box
+              component="video"
+              controls
+              playsInline
+              preload="metadata"
+              src={firstVideoHero.abs}
+              sx={{
+                width: '100%',
+                display: 'block',
+                maxHeight: { xs: 280, sm: 360 },
+                objectFit: 'cover',
+                bgcolor: 'common.black',
+              }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={blogCoverImageUrl(blog, { width: 1200, height: 540 })}
+              alt=""
+              loading="eager"
+              decoding="async"
+              sx={{
+                width: '100%',
+                display: 'block',
+                maxHeight: { xs: 240, sm: 320 },
+                objectFit: 'cover',
+              }}
+            />
+          )
         )}
         <Stack spacing={2} sx={{ p: { xs: 2.5, md: 4 } }}>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
@@ -125,8 +146,17 @@ export default function BlogDetailPage() {
             </Stack>
           )}
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-            <Button variant="outlined" startIcon={<FavoriteBorderRoundedIcon />} disabled={!token} onClick={() => toggleLike.mutate(slug)}>
-              Like
+            <Button
+              variant="outlined"
+              color={liked ? 'error' : 'primary'}
+              startIcon={liked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+              disabled={!token}
+              onClick={() => {
+                setLiked((v) => !v);
+                toggleLike.mutate(slug);
+              }}
+            >
+              {liked ? 'Liked' : 'Like'}
             </Button>
             <Button
               variant="outlined"

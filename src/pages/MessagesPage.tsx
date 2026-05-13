@@ -1,8 +1,6 @@
 import ArrowBackIosNewRoundedIcon from '@mui/icons-material/ArrowBackIosNewRounded';
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
-import EditRoundedIcon from '@mui/icons-material/EditRounded';
-import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import {
   Avatar,
   Box,
@@ -29,13 +27,11 @@ import PageShell from '../components/PageShell';
 import type { ConversationSummary, Message } from '../api/types';
 import {
   useConversations,
-  useDeleteMessage,
   useMessages,
   useProfile,
   useSendMessage,
   useSuggestedUsers,
   useToggleFollow,
-  useUpdateMessage,
 } from '../api/hooks';
 
 type SuggestionsRailProps = {
@@ -117,8 +113,6 @@ export default function MessagesPage() {
   const messagesQuery = useMessages(selectedUserId);
   const followMutation = useToggleFollow();
   const sendMutation = useSendMessage();
-  const updateMessage = useUpdateMessage();
-  const deleteMessage = useDeleteMessage();
 
   const meId = (profileQuery.data as { id?: number } | undefined)?.id;
 
@@ -333,22 +327,28 @@ export default function MessagesPage() {
                               initial={{ opacity: 0, y: 6 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.2 }}
-                              style={{ maxWidth: '100%', minWidth: 0 }}
+                              style={{
+                                maxWidth: '100%',
+                                minWidth: 0,
+                                width: mine ? 'auto' : 'auto',
+                                marginLeft: mine ? 'auto' : 0,
+                                marginRight: mine ? 0 : 'auto',
+                              }}
                             >
                               <Box
                                 sx={{
-                                  maxWidth: 'min(520px, 88%)',
+                                  maxWidth: { xs: 'min(94%, 560px)', sm: 'min(88%, 620px)' },
                                   width: 'max-content',
-                                  minWidth: 0,
+                                  minWidth: { xs: 'min(56%, 200px)', sm: 120 },
                                   boxSizing: 'border-box',
                                   bgcolor: mine ? 'primary.main' : alpha(theme.palette.text.primary, theme.palette.mode === 'light' ? 0.06 : 0.12),
                                   color: mine ? theme.palette.primary.contrastText : theme.palette.text.primary,
                                   borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                                  px: 2,
-                                  py: 1.25,
+                                  px: { xs: 2, sm: 2.25 },
+                                  py: { xs: 1.25, sm: 1.35 },
                                 }}
                               >
-                                <Typography variant="caption" sx={{ opacity: mine ? 0.9 : 0.7, display: 'block', mb: 0.5 }}>
+                                <Typography variant="caption" sx={{ opacity: mine ? 0.9 : 0.72, display: 'block', mb: 0.5 }}>
                                   @{msg.sender_name}
                                 </Typography>
                                 <Typography
@@ -357,6 +357,7 @@ export default function MessagesPage() {
                                     whiteSpace: 'pre-wrap',
                                     overflowWrap: 'break-word',
                                     wordBreak: 'normal',
+                                    lineHeight: 1.55,
                                   }}
                                 >
                                   {msg.content}
@@ -368,23 +369,6 @@ export default function MessagesPage() {
                                       {msg.shared_blog_title || msg.shared_blog_slug}
                                     </Box>
                                   </Typography>
-                                ) : null}
-                                {mine ? (
-                                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
-                                    <IconButton
-                                      size="small"
-                                      onClick={async () => {
-                                        const updated = prompt('Edit message', msg.content);
-                                        if (!updated || updated === msg.content) return;
-                                        await updateMessage.mutateAsync({ id: msg.id, content: updated });
-                                      }}
-                                    >
-                                      <EditRoundedIcon fontSize="inherit" />
-                                    </IconButton>
-                                    <IconButton size="small" onClick={() => deleteMessage.mutate(msg.id)}>
-                                      <DeleteRoundedIcon fontSize="inherit" />
-                                    </IconButton>
-                                  </Stack>
                                 ) : null}
                               </Box>
                             </motion.div>

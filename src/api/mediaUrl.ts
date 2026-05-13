@@ -36,6 +36,16 @@ function firstImageFile(items: BlogMediaItem[] | undefined): string | undefined 
   return items?.find((m) => m.media_type === 'image')?.file;
 }
 
+/** First video attachment URL, if any. */
+export function firstBlogVideoUrl(items: BlogMediaItem[] | undefined): string | undefined {
+  return absoluteMediaUrl(items?.find((m) => m.media_type === 'video')?.file);
+}
+
+/** First image attachment URL, if any. */
+export function firstBlogImageUrl(items: BlogMediaItem[] | undefined): string | undefined {
+  return absoluteMediaUrl(firstImageFile(items));
+}
+
 /**
  * Cover image for cards and heroes: real upload when present, otherwise a stable random-looking
  * photo per post (Picsum seeded URL — same id/slug always maps to the same image).

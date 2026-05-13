@@ -1,3 +1,4 @@
+import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CreateRoundedIcon from '@mui/icons-material/CreateRounded';
 import {
@@ -9,8 +10,6 @@ import {
   DialogTitle,
   FormControlLabel,
   IconButton,
-  LinearProgress,
-  MenuItem,
   Stack,
   Switch,
   TextField,
@@ -18,10 +17,13 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useSnackbar } from 'notistack';
-import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-import { useAiGenerateDraft, useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
+import { useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
 function getErrorMessage(err: unknown): string {
   if (err && typeof err === 'object' && 'response' in err) {
@@ -35,10 +37,17 @@ function getErrorMessage(err: unknown): string {
         if (first && typeof first === 'object' && 'msg' in first) return String((first as { msg: unknown }).msg);
       }
       if (typeof d.message === 'string') return d.message;
+      const fileErr = d.file;
+      if (Array.isArray(fileErr) && fileErr[0]) return String(fileErr[0]);
+      if (typeof fileErr === 'string') return fileErr;
     }
   }
   if (err instanceof Error) return err.message;
   return 'Something went wrong. Try again.';
+}
+
+function mediaTypeFromFile(file: File): 'image' | 'video' {
+  return file.type.startsWith('video/') ? 'video' : 'image';
 }
 
 type CreatePostModalProps = {
@@ -48,32 +57,63 @@ type CreatePostModalProps = {
 
 export default function CreatePostModal({ open, onClose }: CreatePostModalProps) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const [form, setForm] = useState({ title: '', content: '', is_published: true });
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [aiPrompt, setAiPrompt] = useState('');
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const createBlogMutation = useCreateBlog();
   const uploadMediaMutation = useUploadBlogMedia();
   const shareMutation = useCreateShareLink();
-  const aiGenerateMutation = useAiGenerateDraft();
 
   useEffect(() => {
     if (!open) {
       return;
     }
     setForm({ title: '', content: '', is_published: true });
-    setMediaType('image');
     setMediaFile(null);
-    setAiPrompt('');
+    setMediaPreviewUrl(null);
   }, [open]);
+
+  useEffect(() => {
+    if (!mediaFile) {
+      setMediaPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(mediaFile);
+    setMediaPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [mediaFile]);
 
   const handleClose = () => {
     if (createBlogMutation.isPending || uploadMediaMutation.isPending || shareMutation.isPending) {
       return;
     }
     onClose();
+  };
+
+  const onPickFile = (list: FileList | null) => {
+    const file = list?.[0];
+    if (!file) {
+      setMediaFile(null);
+      return;
+    }
+    const mt = mediaTypeFromFile(file);
+    const max = mt === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+    if (file.size > max) {
+      enqueueSnackbar(
+        mt === 'video' ? 'Video must be 20MB or smaller.' : 'Image must be 10MB or smaller.',
+        { variant: 'warning' },
+      );
+      setMediaFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    setMediaFile(file);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -93,6 +133,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       });
 
       if (mediaFile) {
+        const mediaType = mediaTypeFromFile(mediaFile);
         await uploadMediaMutation.mutateAsync({
           blogId: createdBlog.id,
           file: mediaFile,
@@ -112,10 +153,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       }
 
       const published = Boolean(form.is_published);
-      const primary =
-        published
-          ? `Published: “${createdBlog.title}”.`
-          : `Draft saved: “${createdBlog.title}”.`;
+      const primary = published ? `Published: “${createdBlog.title}”.` : `Draft saved: “${createdBlog.title}”.`;
       const secondary = shareUrl ? ' Share link copied to clipboard.' : '';
 
       enqueueSnackbar(`${primary}${secondary}`, {
@@ -124,11 +162,13 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
         action: (key) => (
           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
             <Button
-              component={RouterLink}
-              to={`/blogs/${createdBlog.slug}`}
+              type="button"
               color="inherit"
               size="small"
-              onClick={() => closeSnackbar(key)}
+              onClick={() => {
+                closeSnackbar(key);
+                navigate(`/blogs/${createdBlog.slug}`);
+              }}
             >
               View post
             </Button>
@@ -146,7 +186,6 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
   };
 
   const busy = createBlogMutation.isPending || uploadMediaMutation.isPending || shareMutation.isPending;
-  const aiBusy = aiGenerateMutation.isPending;
 
   return (
     <Dialog
@@ -169,8 +208,6 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
         },
       }}
     >
-      {aiBusy ? <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }} color="primary" /> : null}
-
       <DialogTitle sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, pr: 1, flexShrink: 0 }}>
         <Box>
           <Typography component="span" variant="h6" sx={{ fontWeight: 800 }}>
@@ -185,12 +222,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
         </IconButton>
       </DialogTitle>
 
-      <Box
-        component="form"
-        onSubmit={submit}
-        noValidate
-        sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-      >
+      <Box component="form" onSubmit={submit} noValidate sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <DialogContent
           dividers
           sx={{
@@ -201,53 +233,6 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
           }}
         >
           <Stack spacing={2.25}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.6 }}>
-              Optional: <strong>Generate</strong> fills title and body from a small server template (
-              <code style={{ fontSize: '0.78em' }}>blogixy-draft-v1</code>
-              ) — not a live LLM. Edit before you publish.
-            </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <TextField
-                fullWidth
-                label="AI prompt (optional)"
-                variant="filled"
-                placeholder="e.g. a short post about weekend photography…"
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                  }
-                }}
-                disabled={busy || aiBusy}
-              />
-              <Button
-                type="button"
-                variant="outlined"
-                sx={{ flexShrink: 0, alignSelf: { sm: 'center' } }}
-                disabled={busy || aiBusy || !aiPrompt.trim()}
-                onClick={async () => {
-                  try {
-                    const draft = await aiGenerateMutation.mutateAsync({
-                      prompt: aiPrompt.trim(),
-                      tone: 'professional',
-                      length: 'medium',
-                    });
-                    setForm((prev) => ({
-                      ...prev,
-                      title: (draft.title as string) ?? prev.title,
-                      content: (draft.content as string) ?? prev.content,
-                    }));
-                    enqueueSnackbar('Draft generated — review and edit before publishing.', { variant: 'info' });
-                  } catch (err) {
-                    enqueueSnackbar(getErrorMessage(err), { variant: 'error' });
-                  }
-                }}
-              >
-                {aiBusy ? 'Working…' : 'Generate'}
-              </Button>
-            </Stack>
-
             <TextField
               label="Title"
               variant="filled"
@@ -260,7 +245,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                   e.preventDefault();
                 }
               }}
-              disabled={busy || aiBusy}
+              disabled={busy}
             />
             <TextField
               label="Body"
@@ -271,7 +256,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
               required
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
-              disabled={busy || aiBusy}
+              disabled={busy}
             />
             <FormControlLabel
               label="Publish immediately"
@@ -280,31 +265,104 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                 <Switch
                   checked={form.is_published}
                   onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
-                  disabled={busy || aiBusy}
+                  disabled={busy}
                 />
               }
             />
-            <TextField
-              select
-              variant="filled"
-              label="Lead media type"
-              helperText={mediaFile ? mediaFile.name : 'Optional — uploads after the post is created'}
-              value={mediaType}
-              onChange={(e) => setMediaType(e.target.value as 'image' | 'video')}
-              disabled={busy || aiBusy}
+
+            <input
+              ref={fileInputRef}
+              hidden
+              type="file"
+              accept="image/*,video/*"
+              onChange={(e) => onPickFile(e.target.files)}
+            />
+            <Box
+              role="button"
+              tabIndex={0}
+              onClick={() => !busy && fileInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (!busy && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              sx={{
+                borderRadius: 2,
+                border: `2px dashed ${alpha(theme.palette.primary.main, 0.35)}`,
+                bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.04 : 0.08),
+                py: 3,
+                px: 2,
+                textAlign: 'center',
+                cursor: busy ? 'default' : 'pointer',
+                opacity: busy ? 0.6 : 1,
+                transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                '&:hover': !busy
+                  ? {
+                      borderColor: alpha(theme.palette.primary.main, 0.65),
+                      bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.07 : 0.12),
+                    }
+                  : {},
+              }}
             >
-              <MenuItem value="image">Image</MenuItem>
-              <MenuItem value="video">Video</MenuItem>
-            </TextField>
-            <Button variant="outlined" component="label" disabled={busy || aiBusy} sx={{ alignSelf: 'flex-start' }}>
-              Attach file ({mediaType})
-              <input
-                hidden
-                type="file"
-                accept={mediaType === 'image' ? 'image/*' : 'video/*'}
-                onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
-              />
-            </Button>
+              <CloudUploadRoundedIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Click to upload image or video
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                Type is detected from the file. Max 10MB images, 20MB videos.
+              </Typography>
+              {mediaFile ? (
+                <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 600 }} color="primary">
+                  {mediaFile.name} ({mediaTypeFromFile(mediaFile) === 'video' ? 'Video' : 'Image'})
+                </Typography>
+              ) : null}
+              {mediaFile && mediaPreviewUrl ? (
+                <Box
+                  sx={{
+                    mt: 2,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                    maxHeight: 320,
+                    bgcolor: alpha(theme.palette.common.black, 0.04),
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {mediaTypeFromFile(mediaFile) === 'video' ? (
+                    <Box
+                      component="video"
+                      src={mediaPreviewUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      sx={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'contain', bgcolor: 'common.black' }}
+                    />
+                  ) : (
+                    <Box
+                      component="img"
+                      src={mediaPreviewUrl}
+                      alt=""
+                      sx={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'contain', verticalAlign: 'middle' }}
+                    />
+                  )}
+                </Box>
+              ) : null}
+              {mediaFile ? (
+                <Button
+                  type="button"
+                  size="small"
+                  sx={{ mt: 1 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMediaFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                >
+                  Remove attachment
+                </Button>
+              ) : null}
+            </Box>
           </Stack>
         </DialogContent>
 
@@ -321,7 +379,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
           <Button type="button" onClick={handleClose} disabled={busy} color="inherit">
             Cancel
           </Button>
-          <Button type="submit" variant="contained" startIcon={<CreateRoundedIcon />} disabled={busy || aiBusy}>
+          <Button type="submit" variant="contained" startIcon={<CreateRoundedIcon />} disabled={busy}>
             {busy ? 'Saving…' : form.is_published ? 'Publish' : 'Save draft'}
           </Button>
         </DialogActions>

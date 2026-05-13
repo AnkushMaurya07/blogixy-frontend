@@ -1,12 +1,13 @@
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import ModeCommentRoundedIcon from '@mui/icons-material/ModeCommentRounded';
 import { Box, Button, Card, CardActions, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 
-import { blogCoverImageUrl } from '../api/mediaUrl';
+import { blogCoverImageUrl, firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 type BlogCardProps = {
@@ -17,12 +18,14 @@ type BlogCardProps = {
 export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
   const theme = useTheme();
   const cover = blogCoverImageUrl(blog, { width: 800, height: 450 });
+  const videoSrc = firstBlogVideoUrl(blog.media_items);
+  const imageSrc = firstBlogImageUrl(blog.media_items);
 
   return (
     <motion.article
       layout
       whileHover={{ y: -4 }}
-      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }}
       style={{ height: '100%' }}
     >
       <Card
@@ -51,14 +54,25 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
             borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
           }}
         >
-          <Box
-            component="img"
-            loading="lazy"
-            decoding="async"
-            src={cover}
-            alt=""
-            sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
-          />
+          {videoSrc ? (
+            <Box
+              component="video"
+              src={videoSrc}
+              controls
+              playsInline
+              preload="metadata"
+              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover', bgcolor: 'common.black' }}
+            />
+          ) : (
+            <Box
+              component="img"
+              loading="lazy"
+              decoding="async"
+              src={imageSrc ?? cover}
+              alt=""
+              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
+            />
+          )}
         </Box>
         <CardContent sx={{ flexGrow: 1, pt: 2.5, pb: 1 }}>
           <Stack spacing={1.75}>
@@ -97,7 +111,17 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
             </Button>
             <Stack direction="row" spacing={2} sx={{ '& .MuiChip-root': { borderRadius: 2 } }}>
               <Chip variant="filled" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
-              <Chip variant="filled" icon={<FavoriteBorderRoundedIcon fontSize="inherit" />} label={`${blog.likes_count} likes`} />
+              <Chip
+                variant="filled"
+                icon={
+                  blog.is_liked ? (
+                    <FavoriteRoundedIcon fontSize="inherit" sx={{ color: 'error.main' }} />
+                  ) : (
+                    <FavoriteBorderRoundedIcon fontSize="inherit" />
+                  )
+                }
+                label={`${blog.likes_count} likes`}
+              />
               <Chip variant="filled" icon={<ModeCommentRoundedIcon fontSize="inherit" />} label={`${blog.comments_count}`} />
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -111,8 +135,8 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               variant="outlined"
               size="medium"
               fullWidth
-              color="secondary"
-              endIcon={<FavoriteBorderRoundedIcon />}
+              color={blog.is_liked ? 'error' : 'secondary'}
+              endIcon={blog.is_liked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
               onClick={() => onLikeToggle()}
             >
               Like or unlike

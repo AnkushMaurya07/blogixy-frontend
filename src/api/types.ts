@@ -15,6 +15,27 @@ export type BlogPayload = {
   is_published: boolean;
 };
 
+export type BlogAnalyticsRecentRow = {
+  slug: string;
+  title: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  is_published: boolean;
+};
+
+export type BlogAnalytics = {
+  total_posts: number;
+  total_views: number;
+  total_likes: number;
+  total_comments: number;
+  avg_views_per_post: number;
+  most_viewed_post: { slug: string; title: string; view_count: number } | null;
+  recent_activity: BlogAnalyticsRecentRow[];
+};
+
 export type BlogMediaItem = {
   id: number;
   media_type: 'image' | 'video';
@@ -30,6 +51,8 @@ export type BlogPost = {
   author_avatar?: string | null;
   /** Present when API includes favorite context for the current user. */
   is_favorited?: boolean;
+  /** True when the authenticated user has liked this post. */
+  is_liked?: boolean;
   title: string;
   slug: string;
   content: string;

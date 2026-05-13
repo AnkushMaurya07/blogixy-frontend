@@ -8,6 +8,7 @@ import {
   Chip,
   Divider,
   Grid,
+  LinearProgress,
   Paper,
   Skeleton,
   Stack,
@@ -18,7 +19,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import {
   useFavoriteBlogs,
@@ -57,6 +58,7 @@ export default function HomePage() {
   const theme = useTheme();
   const token = useAppSelector((s) => s.auth.accessToken);
   const [feedTab, setFeedTab] = useState(0);
+  const [feedTabPending, startFeedTabTransition] = useTransition();
 
   const mainFeedAll = useInfiniteHomeFeed({ section: 'all', enabled: !token || feedTab === 0 });
   const activeHomeFeed = !token || feedTab === 0 ? mainFeedAll : null;
@@ -70,7 +72,7 @@ export default function HomePage() {
   const toggleFollow = useToggleFollow();
 
   const timelinePosts = useMemo(
-    () => activeHomeFeed?.data?.pages.flatMap((p) => p.results) ?? [],
+    () => (activeHomeFeed?.data?.pages ?? []).flatMap((p) => p.results ?? []),
     [activeHomeFeed?.data],
   );
 
@@ -155,9 +157,14 @@ export default function HomePage() {
   );
 
   return (
-    <PageShell>
-      <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ alignItems: 'flex-start' }}>
-        <Grid size={{ xs: 12, md: 8 }} sx={{ maxWidth: { md: 680 }, mx: { md: 'auto' }, width: '100%' }}>
+    <PageShell containerSx={{ pt: 0 }}>
+      <Grid
+        container
+        columnSpacing={{ xs: 2.5, md: 3 }}
+        rowSpacing={{ xs: 2.5, md: 0 }}
+        sx={{ alignItems: 'flex-start', maxWidth: '100%' }}
+      >
+        <Grid size={{ xs: 12, md: 8 }} sx={{ width: '100%', minWidth: 0 }}>
           <Stack spacing={0}>
             {/* Feed shell — Twitter / X style list container */}
             <Paper
@@ -165,16 +172,17 @@ export default function HomePage() {
               sx={{
                 borderRadius: { xs: 0, sm: 3 },
                 overflow: 'hidden',
-                border: { xs: 'none', sm: `1px solid ${alpha(theme.palette.divider, 0.14)}` },
+                border: { xs: 'none', sm: 'none' },
                 bgcolor: 'background.paper',
                 mx: { xs: -2.5, sm: 0 },
               }}
             >
               <Box
-                sx={{
-                  px: 2,
-                  py: 1.75,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+                  sx={{
+                    px: 2.25,
+                    pt: { xs: 0.25, sm: 0.5 },
+                    pb: 1.25,
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                   position: 'sticky',
                   top: { md: 72 },
                   zIndex: 2,
@@ -187,10 +195,10 @@ export default function HomePage() {
                     display: 'flex',
                     flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: token ? 'space-between' : 'flex-start',
                     gap: 1.5,
                     width: '100%',
-                    minHeight: 40,
+                    minHeight: 0,
                   }}
                 >
                   <Typography
@@ -234,24 +242,14 @@ export default function HomePage() {
                     >
                       Post
                     </Button>
-                  ) : (
-                    <Button
-                      component={RouterLink}
-                      to="/auth"
-                      variant="outlined"
-                      size="small"
-                      sx={{ flexShrink: 0, alignSelf: 'center', textTransform: 'none' }}
-                    >
-                      Sign in
-                    </Button>
-                  )}
+                  ) : null}
                 </Box>
               </Box>
 
               {token && suggestions.length > 0 ? (
                 <Box
                   sx={{
-                    mt: '20px',
+                    mt: 2.5,
                     py: 2,
                     borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                     bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.02 : 0.06),
@@ -370,22 +368,44 @@ export default function HomePage() {
               ) : null}
 
               {token ? (
-                <Tabs
-                  value={feedTab}
-                  onChange={(_, v: number) => setFeedTab(v)}
-                  variant="fullWidth"
-                  sx={{
-                    minHeight: 48,
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 48 },
-                  }}
-                >
-                  <Tab label="Feed" />
-                  <Tab label="Saved" />
-                </Tabs>
+                <Box>
+                  <Tabs
+                    value={feedTab}
+                    onChange={(_, v: number) => {
+                      startFeedTabTransition(() => setFeedTab(v));
+                    }}
+                    variant="fullWidth"
+                    sx={{
+                      minHeight: 48,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 48 },
+                    }}
+                  >
+                    <Tab label="Feed" />
+                    <Tab label="Saved" />
+                  </Tabs>
+                  {feedTabPending ? (
+                    <LinearProgress
+                      color="primary"
+                      sx={{
+                        height: 2,
+                        borderRadius: 0,
+                        '& .MuiLinearProgress-bar': { borderRadius: 0 },
+                      }}
+                    />
+                  ) : (
+                    <Box sx={{ height: 2 }} aria-hidden />
+                  )}
+                </Box>
               ) : null}
 
-              <Box sx={{ px: { xs: 0, sm: 0 }, pt: '20px' }}>
+              <Box
+                sx={{
+                  px: { xs: 0, sm: 0 },
+                  /* Theme spacing: smaller when signed out (no tabs); room under tabs when signed in */
+                  pt: token ? 2 : 1,
+                }}
+              >
                 {feedError ? (
                   <Box sx={{ p: 3, textAlign: 'center' }}>
                     <Typography variant="body2" color="error" sx={{ mb: 2 }}>
@@ -396,10 +416,10 @@ export default function HomePage() {
                     </Button>
                   </Box>
                 ) : feedLoading && timelinePosts.length === 0 ? (
-                  <Stack>
-                    <FeedLineSkeleton />
-                    <FeedLineSkeleton />
-                    <FeedLineSkeleton />
+                  <Stack spacing={0}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <FeedLineSkeleton key={`feed-sk-${String(i)}`} />
+                    ))}
                   </Stack>
                 ) : token ? (
                   feedTab === 0 ? (
@@ -507,14 +527,13 @@ export default function HomePage() {
           </Stack>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: 'none', md: 'block' }, minWidth: 0 }}>
           <Box sx={{ position: 'sticky', top: 96 }}>
             <Paper
               elevation={0}
               sx={{
-                p: 2.5,
+                p: 2.75,
                 borderRadius: 3,
-                border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
               }}
             >
               <Typography
@@ -615,9 +634,8 @@ export default function HomePage() {
               elevation={0}
               sx={{
                 mt: 2,
-                p: 2,
+                p: 2.25,
                 borderRadius: 3,
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
               }}
             >
               <Typography variant="caption" color="text.secondary">

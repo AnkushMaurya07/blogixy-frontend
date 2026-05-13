@@ -1,28 +1,35 @@
-import MarkEmailUnreadRoundedIcon from '@mui/icons-material/MarkEmailUnreadRounded';
-import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded';
-import TopicRoundedIcon from '@mui/icons-material/TopicRounded';
 import { Box, Button, Chip, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import { motion } from 'framer-motion';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useSnackbar } from 'notistack';
+import { Link as RouterLink } from 'react-router-dom';
 
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../api/hooks';
 import PageShell from '../components/PageShell';
+import { getNotificationVisual, getToneMain } from '../utils/notificationVisual';
 
-type NotificationRow = { id: number; title: string; message: string; is_read: boolean; created_at?: string };
+type NotificationRow = {
+  id: number;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at?: string;
+  notification_type?: string;
+  actor_name?: string;
+  target_blog_slug?: string;
+  payload?: { blog_slug?: string; sender_id?: number };
+};
 
 export default function NotificationsPage() {
   const theme = useTheme();
+  const { enqueueSnackbar } = useSnackbar();
   const { data, isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const rows = (
-    data as (NotificationRow & {
-      notification_type?: string;
-      actor_name?: string;
-      target_blog_slug?: string;
-    })[] | undefined
-  ) ?? [];
+  const rows = (data as NotificationRow[] | undefined) ?? [];
+
+  const blogSlugFor = (note: NotificationRow) => note.target_blog_slug ?? note.payload?.blog_slug;
 
   return (
     <PageShell>
@@ -36,7 +43,7 @@ export default function NotificationsPage() {
             Incoming messages ping here instantly—paired with richer context from posts and moderation events.
           </Typography>
         </Stack>
-        <Button variant="outlined" onClick={() => markAllRead.mutate()} sx={{ alignSelf: { md: 'flex-start' } }}>
+        <Button type="button" variant="outlined" onClick={() => markAllRead.mutate()} sx={{ alignSelf: { md: 'flex-start' } }}>
           Mark all read
         </Button>
       </Stack>
@@ -48,7 +55,10 @@ export default function NotificationsPage() {
           ))}
         {!isLoading &&
           rows.map((note, idx) => {
-            const isMessageAlert = (note.notification_type ?? note.title).toLowerCase().includes('message');
+            const { Icon, tone } = getNotificationVisual(note);
+            const toneMain = getToneMain(theme, tone);
+            const slug = blogSlugFor(note);
+            const isMessageAlert = (note.notification_type ?? '').toLowerCase() === 'message';
             return (
               <motion.div key={note.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.035 }}>
                 <Paper
@@ -59,9 +69,7 @@ export default function NotificationsPage() {
                     display: 'flex',
                     gap: { xs: 2, md: 2.5 },
                     alignItems: 'flex-start',
-                    borderLeft: `4px solid ${
-                      isMessageAlert ? theme.palette.warning.light : alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.5 : 0.8)
-                    }`,
+                    borderLeft: `4px solid ${alpha(toneMain, theme.palette.mode === 'light' ? 0.75 : 0.9)}`,
                   }}
                 >
                   <Box
@@ -72,16 +80,13 @@ export default function NotificationsPage() {
                       borderRadius: 2,
                       display: 'grid',
                       placeItems: 'center',
-                      bgcolor:
-                        theme.palette.mode === 'light'
-                          ? alpha(theme.palette.primary.main, 0.06)
-                          : alpha(theme.palette.primary.main, 0.16),
-                      color: theme.palette.primary.main,
+                      bgcolor: alpha(toneMain, theme.palette.mode === 'light' ? 0.08 : 0.18),
+                      color: toneMain,
                     }}
                   >
-                    {isMessageAlert ? <MarkEmailUnreadRoundedIcon /> : note.title.includes('published') ? <TopicRoundedIcon /> : <NotificationsActiveRoundedIcon />}
+                    <Icon sx={{ fontSize: 26 }} />
                   </Box>
-                  <Stack sx={{ flex: 1 }}>
+                  <Stack sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                         {note.title}
@@ -91,22 +96,42 @@ export default function NotificationsPage() {
                         <Chip variant="outlined" label={note.is_read ? 'Read' : 'New'} />
                       </Stack>
                     </Stack>
-                      {note.actor_name ? (
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
-                          Triggered by @{note.actor_name}
-                        </Typography>
-                      ) : null}
+                    {note.actor_name ? (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
+                        Triggered by @{note.actor_name}
+                      </Typography>
+                    ) : null}
                     <Typography variant="body2" sx={{ mt: 1 }}>
                       {note.message}
                     </Typography>
-                      {note.target_blog_slug ? (
-                        <Typography variant="caption" sx={{ mt: 0.75 }}>
-                          Blog: {note.target_blog_slug}
-                        </Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 1.5, flexWrap: 'wrap', alignItems: { sm: 'center' } }}>
+                      {slug ? (
+                        <Button component={RouterLink} to={`/blogs/${slug}`} variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>
+                          Open related post
+                        </Button>
                       ) : null}
+                      {isMessageAlert && note.payload?.sender_id ? (
+                        <Button component={RouterLink} to={`/messages?with=${note.payload.sender_id}`} variant="text" size="small" sx={{ alignSelf: 'flex-start' }}>
+                          Open conversation
+                        </Button>
+                      ) : null}
+                    </Stack>
                     {!note.is_read && (
                       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 2 }}>
-                        <Button variant="text" sx={{ alignSelf: { md: 'flex-start' } }} onClick={() => markRead.mutate(note.id)}>
+                        <Button
+                          type="button"
+                          variant="text"
+                          sx={{ alignSelf: { md: 'flex-start' } }}
+                          disabled={markRead.isPending}
+                          onClick={() => {
+                            markRead.mutate(note.id, {
+                              onError: (err) => {
+                                const msg = err && typeof err === 'object' && 'message' in err ? String((err as Error).message) : 'Could not mark as read.';
+                                enqueueSnackbar(msg, { variant: 'error' });
+                              },
+                            });
+                          }}
+                        >
                           Mark as read
                         </Button>
                       </Stack>

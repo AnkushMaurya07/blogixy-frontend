@@ -1,9 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../features/auth/hooks';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
 
 import { apiClient } from './client';
 import type {
+  BlogAnalytics,
   BlogPayload,
   BlogPost,
   FavoriteEntry,
@@ -106,6 +107,29 @@ export const useBlogs = () =>
 const HOME_FEED_PAGE_SIZE = 10;
 const EXPLORE_PAGE_SIZE = 10;
 
+async function fetchExploreBlogsPage(pageParam: number, search: string, sort: 'latest' | 'ranking') {
+  return (
+    await apiClient.get<PaginatedHomeFeedResponse>('/blogs/', {
+      params: {
+        search: search || undefined,
+        sort,
+        page: pageParam,
+        page_size: EXPLORE_PAGE_SIZE,
+      },
+    })
+  ).data;
+}
+
+/** Warms the default Explore query + route chunk so first open feels instant. */
+export function prefetchExploreDefault(queryClient: QueryClient) {
+  return queryClient.prefetchInfiniteQuery({
+    queryKey: ['blogs', 'explore', '', 'ranking', EXPLORE_PAGE_SIZE],
+    queryFn: ({ pageParam }) => fetchExploreBlogsPage(Number(pageParam), '', 'ranking'),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage: PaginatedHomeFeedResponse) => (lastPage.has_next ? lastPage.page + 1 : undefined),
+  });
+}
+
 export type HomeFeedSection = 'all' | 'following' | 'discover';
 
 export const useInfiniteHomeFeed = (opts: { section: HomeFeedSection; enabled?: boolean }) =>
@@ -131,20 +155,10 @@ export const useInfiniteHomeFeed = (opts: { section: HomeFeedSection; enabled?: 
 export const useInfiniteExploreBlogs = (params: { search: string; sort: 'latest' | 'ranking' }) =>
   useInfiniteQuery({
     queryKey: ['blogs', 'explore', params.search, params.sort, EXPLORE_PAGE_SIZE],
-    queryFn: async ({ pageParam }) =>
-      (
-        await apiClient.get<PaginatedHomeFeedResponse>('/blogs/', {
-          params: {
-            search: params.search || undefined,
-            sort: params.sort,
-            page: pageParam,
-            page_size: EXPLORE_PAGE_SIZE,
-          },
-        })
-      ).data,
+    queryFn: ({ pageParam }) => fetchExploreBlogsPage(Number(pageParam), params.search, params.sort),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.has_next ? lastPage.page + 1 : undefined),
-    staleTime: 20_000,
+    staleTime: 60_000,
   });
 
 export const useFavoriteBlogs = () => {
@@ -187,6 +201,40 @@ export const useCreateBlog = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blogs'] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'drafts'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    },
+  });
+};
+
+export const useMyDrafts = () => {
+  const token = useAppSelector((s) => s.auth.accessToken);
+  return useQuery({
+    queryKey: ['blogs', 'drafts'],
+    queryFn: async () =>
+      (
+        await apiClient.get<PaginatedHomeFeedResponse>('/blogs/', {
+          params: { drafts_only: true, page: 1, page_size: 100 },
+        })
+      ).data,
+    enabled: Boolean(token),
+    staleTime: 15_000,
+  });
+};
+
+export const useUpdateBlog = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { slug: string } & Partial<BlogPayload>) => {
+      const { slug, ...body } = payload;
+      return (await apiClient.patch<BlogPost>(`/blogs/${slug}/`, body)).data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'drafts'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'explore'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-detail', variables.slug] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });
@@ -237,8 +285,26 @@ export const useMarkNotificationRead = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (notificationId: number) =>
-      (await apiClient.patch(`/notifications/${notificationId}/`, { is_read: true })).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      (await apiClient.post(`/notifications/${notificationId}/mark-read/`)).data,
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const previous = queryClient.getQueryData<unknown[]>(['notifications']);
+      queryClient.setQueryData(['notifications'], (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((row: { id: number; is_read?: boolean }) =>
+          row.id === notificationId ? { ...row, is_read: true } : row,
+        );
+      });
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(['notifications'], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
   });
 };
 
@@ -261,7 +327,13 @@ export const useCreateComment = (slug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => (await apiClient.post(`/blogs/${slug}/comments/`, { content })).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blog-comments', slug] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog-comments', slug] });
+      queryClient.invalidateQueries({ queryKey: ['blog-detail-comments', slug] });
+      queryClient.invalidateQueries({ queryKey: ['blog-detail', slug] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'explore'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+    },
   });
 };
 
@@ -273,6 +345,9 @@ export const useToggleLike = () => {
       queryClient.invalidateQueries({ queryKey: ['blogs', 'explore'] });
       queryClient.invalidateQueries({ queryKey: ['blogs', slug] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'by-author'] });
+      queryClient.invalidateQueries({ queryKey: ['blogs', 'favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['blog-detail', slug] });
     },
   });
 };
@@ -281,7 +356,7 @@ export const useAnalytics = () => {
   const token = useAppSelector((s) => s.auth.accessToken);
   return useQuery({
     queryKey: ['analytics'],
-    queryFn: async () => (await apiClient.get('/blogs/analytics/')).data,
+    queryFn: async () => (await apiClient.get<BlogAnalytics>('/blogs/analytics/')).data,
     enabled: Boolean(token),
   });
 };

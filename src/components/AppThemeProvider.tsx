@@ -4,18 +4,32 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { SnackbarProvider } from 'notistack';
 import { useMemo, type PropsWithChildren } from 'react';
 
+import BlogixySnackbarContent from './BlogixySnackbarContent';
 import { useAppSelector } from '../features/auth/hooks';
 import { createBlogixyTheme } from '../theme/createAppTheme';
 
 function ToastHost({ children }: PropsWithChildren) {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
+  const snackbarComponents = useMemo(
+    () =>
+      ({
+        default: BlogixySnackbarContent,
+        success: BlogixySnackbarContent,
+        error: BlogixySnackbarContent,
+        warning: BlogixySnackbarContent,
+        info: BlogixySnackbarContent,
+      }) as const,
+    [],
+  );
+
   return (
     <SnackbarProvider
       maxSnack={4}
       dense
       preventDuplicate
       anchorOrigin={{ vertical: isXs ? 'top' : 'bottom', horizontal: 'center' }}
+      Components={snackbarComponents}
     >
       {children}
     </SnackbarProvider>

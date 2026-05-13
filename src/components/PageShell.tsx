@@ -1,4 +1,5 @@
 import { Box, Container, type ContainerProps } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 import type { PropsWithChildren } from 'react';
 import { motion } from 'framer-motion';
 
@@ -12,7 +13,12 @@ const widthMap: Record<UIShellMaxWidth, ContainerProps['maxWidth'] | false> = {
   md: 'md',
 };
 
-export default function PageShell({ children }: PropsWithChildren) {
+type PageShellProps = PropsWithChildren<{
+  /** Merged after default `Container` padding (e.g. tighter `pt` on dense pages). */
+  containerSx?: SxProps<Theme>;
+}>;
+
+export default function PageShell({ children, containerSx }: PageShellProps) {
   const shellMaxWidth = useAppSelector((s) => s.ui.shellMaxWidth);
   const maxWidth = widthMap[shellMaxWidth];
 
@@ -20,11 +26,25 @@ export default function PageShell({ children }: PropsWithChildren) {
     <motion.main
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] as const }}
       style={{ width: '100%' }}
     >
-      <Container maxWidth={maxWidth} sx={{ py: '10px', px: { xs: 2.5, sm: 3 } }}>
-        <Box>{children}</Box>
+      <Container maxWidth={maxWidth} sx={{ px: { xs: 2.5, sm: 3 } }}>
+        <Box
+          sx={
+            [
+              {
+                maxWidth: '100%',
+                /* Use explicit pt/pb (not `py`) so overrides like `pt: 0` merge reliably. */
+                pt: { xs: 2.5, sm: 3 },
+                pb: { xs: 2.5, sm: 3 },
+              },
+              ...(containerSx != null ? [containerSx] : []),
+            ] as SxProps<Theme>
+          }
+        >
+          {children}
+        </Box>
       </Container>
     </motion.main>
   );
