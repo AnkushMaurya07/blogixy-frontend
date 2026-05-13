@@ -44,115 +44,99 @@ export default function DashboardPage() {
 
   return (
     <PageShell>
-      <Stack spacing={4}>
-        <Box>
-          <Typography variant="overline" sx={{ letterSpacing: 4, fontWeight: 740 }} color="primary.main">
-            Author workspace
-          </Typography>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 900 }}>
-            Operations dashboard — publish, circulate, quantify.
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Lightweight metrics precede exhaustive GraphQL rollups—we already surface directional truth for author velocity,
-            amplification, and reach.
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 3,
+          alignItems: 'flex-start',
+        }}
+      >
+        <Stack spacing={4} sx={{ flex: 1, minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
+          <Box>
+            <Typography variant="overline" sx={{ letterSpacing: 4, fontWeight: 740 }} color="primary.main">
+              Author workspace
+            </Typography>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 900 }}>
+              Operations dashboard — publish, circulate, quantify.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Lightweight metrics precede exhaustive GraphQL rollups—we already surface directional truth for author velocity,
+              amplification, and reach.
+            </Typography>
+          </Box>
 
-        <Grid container spacing={3} sx={{ alignItems: 'stretch' }}>
-          <Grid size={{ xs: 12, md: 8 }}>
-            <Grid container spacing={3}>
-              {([
-                {
-                  icon: <CreateRoundedIcon />,
-                  label: 'My posts published',
-                  valueKey: 'total_posts' as const,
-                  subtitle: 'Active inventory',
-                },
-                {
-                  icon: <InsightsRoundedIcon />,
-                  label: 'Audience views captured',
-                  valueKey: 'total_views' as const,
-                  subtitle: 'Cumulative glare',
-                },
-                {
-                  icon: <FavoriteRoundedIcon />,
-                  label: 'Likes collected',
-                  valueKey: 'total_likes' as const,
-                  subtitle: 'Applause signal',
-                },
-              ] as const).map((card) => {
-                const numeric = totals ? totals[card.valueKey] : undefined;
-                return (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={card.label}>
-                    <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.25 }}>
-                      <Paper
-                        sx={{
-                          p: { xs: 2.75, md: 3 },
-                          borderRadius: 4,
-                          minHeight: 190,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 1.75,
-                          height: '100%',
-                        }}
-                      >
-                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                          <Box
-                            sx={{
-                              width: 52,
-                              height: 52,
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.primary.main, 0.1),
-                              color: theme.palette.primary.main,
-                              display: 'grid',
-                              placeItems: 'center',
-                            }}
-                          >
-                            {card.icon}
-                          </Box>
-                          <Typography variant="caption" sx={{ letterSpacing: 1.35, fontWeight: 700 }} color="text.secondary">
-                            {card.subtitle}
-                          </Typography>
-                        </Stack>
-                        <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                          {analyticsQuery.isLoading ? '…' : (numeric ?? 0).toLocaleString()}
+          <Grid container spacing={3} sx={{ alignItems: 'stretch' }}>
+            {([
+              {
+                icon: <CreateRoundedIcon />,
+                label: 'My posts published',
+                valueKey: 'total_posts' as const,
+                subtitle: 'Active inventory',
+              },
+              {
+                icon: <InsightsRoundedIcon />,
+                label: 'Audience views captured',
+                valueKey: 'total_views' as const,
+                subtitle: 'Cumulative glare',
+              },
+              {
+                icon: <FavoriteRoundedIcon />,
+                label: 'Likes collected',
+                valueKey: 'total_likes' as const,
+                subtitle: 'Applause signal',
+              },
+            ] as const).map((card) => {
+              const numeric = totals ? totals[card.valueKey] : undefined;
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={card.label}>
+                  <motion.div whileHover={{ y: -6 }} transition={{ duration: 0.25 }}>
+                    <Paper
+                      sx={{
+                        p: { xs: 2.75, md: 3 },
+                        borderRadius: 4,
+                        minHeight: 190,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1.75,
+                        height: '100%',
+                      }}
+                    >
+                      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            color: theme.palette.primary.main,
+                            display: 'grid',
+                            placeItems: 'center',
+                          }}
+                        >
+                          {card.icon}
+                        </Box>
+                        <Typography variant="caption" sx={{ letterSpacing: 1.35, fontWeight: 700 }} color="text.secondary">
+                          {card.subtitle}
                         </Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                          {card.label}
-                        </Typography>
-                        <LinearProgress
-                          variant={typeof numeric === 'number' ? 'determinate' : 'indeterminate'}
-                          value={numeric ? Math.min(100, (numeric % 180) || 62) : 25}
-                          sx={{ mt: 'auto', height: 10, borderRadius: 999 }}
-                        />
-                      </Paper>
-                    </motion.div>
-                  </Grid>
-                );
-              })}
-            </Grid>
+                      </Stack>
+                      <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                        {analyticsQuery.isLoading ? '…' : (numeric ?? 0).toLocaleString()}
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {card.label}
+                      </Typography>
+                      <LinearProgress
+                        variant={typeof numeric === 'number' ? 'determinate' : 'indeterminate'}
+                        value={numeric ? Math.min(100, (numeric % 180) || 62) : 25}
+                        sx={{ mt: 'auto', height: 10, borderRadius: 999 }}
+                      />
+                    </Paper>
+                  </motion.div>
+                </Grid>
+              );
+            })}
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                height: '100%',
-                minHeight: { xs: 420, md: 460 },
-                display: 'flex',
-                flexDirection: 'column',
-                p: { xs: 2, md: 2.5 },
-                borderRadius: 4,
-                border: (t) => `1px solid ${alpha(t.palette.divider, 0.12)}`,
-                background: (t) =>
-                  t.palette.mode === 'light'
-                    ? `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.06)} 0%, ${alpha(t.palette.background.paper, 1)} 42%, ${alpha(t.palette.secondary.main, 0.04)} 100%)`
-                    : `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.12)} 0%, ${alpha(t.palette.background.paper, 0.98)} 45%, ${alpha('#1e293b', 0.5)} 100%)`,
-              }}
-            >
-              <DashboardPetMascot />
-            </Paper>
-          </Grid>
-        </Grid>
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 7 }}>
@@ -239,7 +223,40 @@ export default function DashboardPage() {
             </Paper>
           </Grid>
         </Grid>
-      </Stack>
+        </Stack>
+
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            width: { md: 300, lg: 340 },
+            flexShrink: 0,
+            position: 'sticky',
+            top: (t) => `calc(${t.mixins.toolbar.minHeight}px + ${t.spacing(2)})`,
+            alignSelf: 'flex-start',
+            maxHeight: (t) => `calc(100vh - ${t.mixins.toolbar.minHeight}px - ${t.spacing(4)})`,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              minHeight: 460,
+              display: 'flex',
+              flexDirection: 'column',
+              p: { md: 2.5 },
+              borderRadius: 4,
+              border: (t) => `1px solid ${alpha(t.palette.divider, 0.12)}`,
+              background: (t) =>
+                t.palette.mode === 'light'
+                  ? `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.06)} 0%, ${alpha(t.palette.background.paper, 1)} 42%, ${alpha(t.palette.secondary.main, 0.04)} 100%)`
+                  : `linear-gradient(165deg, ${alpha(t.palette.primary.main, 0.12)} 0%, ${alpha(t.palette.background.paper, 0.98)} 45%, ${alpha('#1e293b', 0.5)} 100%)`,
+              maxHeight: 'inherit',
+              overflow: 'hidden',
+            }}
+          >
+            <DashboardPetMascot />
+          </Paper>
+        </Box>
+      </Box>
     </PageShell>
   );
 }
