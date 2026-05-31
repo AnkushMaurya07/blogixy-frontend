@@ -246,11 +246,8 @@ export const useUploadBlogMedia = () =>
       const formData = new FormData();
       formData.append('file', payload.file);
       formData.append('media_type', payload.mediaType);
-      return (
-        await apiClient.post(`/blogs/${payload.blogId}/media/`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-      ).data;
+      // Let axios set multipart boundary — a manual Content-Type breaks uploads.
+      return (await apiClient.post(`/blogs/${payload.blogId}/media/`, formData, { timeout: 120_000 })).data;
     },
   });
 

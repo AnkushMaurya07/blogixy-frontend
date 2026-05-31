@@ -1,4 +1,5 @@
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
+import axios from 'axios';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CreateRoundedIcon from '@mui/icons-material/CreateRounded';
 import {
@@ -20,14 +21,26 @@ import { useSnackbar } from 'notistack';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useCreateBlog, useCreateShareLink, useUploadBlogMedia } from '../api/hooks';
+import { useCreateBlog, useCreateShareLink, useUpdateBlog, useUploadBlogMedia } from '../api/hooks';
+import type { BlogPost } from '../api/types';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 
-function getErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const data = (err as { response?: { data?: unknown } }).response?.data;
+function getErrorMessage(err: unknown, stage: 'create' | 'upload' = 'create'): string {
+  if (axios.isAxiosError(err)) {
+    if (!err.response) {
+      if (err.code === 'ECONNABORTED') {
+        return stage === 'upload'
+          ? 'Upload timed out. Try a smaller file or check your connection.'
+          : 'Request timed out. Check your connection and try again.';
+      }
+      return stage === 'upload'
+        ? 'Could not upload the attachment. Check your connection and file size (10MB images, 20MB videos), then try again.'
+        : 'Network error. Check your connection and try again.';
+    }
+
+    const data = err.response.data;
     if (typeof data === 'string') return data;
     if (data && typeof data === 'object') {
       const d = data as Record<string, unknown>;
@@ -42,7 +55,13 @@ function getErrorMessage(err: unknown): string {
       if (typeof fileErr === 'string') return fileErr;
     }
   }
-  if (err instanceof Error) return err.message;
+
+  if (err instanceof Error && err.message !== 'Network Error') return err.message;
+  if (err instanceof Error) {
+    return stage === 'upload'
+      ? 'Could not upload the attachment. Check your connection and file size (10MB images, 20MB videos), then try again.'
+      : 'Network error. Check your connection and try again.';
+  }
   return 'Something went wrong. Try again.';
 }
 
@@ -62,9 +81,12 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
   const [form, setForm] = useState({ title: '', content: '', is_published: true });
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
+  const [pendingBlog, setPendingBlog] = useState<BlogPost | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const submittingRef = useRef(false);
 
   const createBlogMutation = useCreateBlog();
+  const updateBlogMutation = useUpdateBlog();
   const uploadMediaMutation = useUploadBlogMedia();
   const shareMutation = useCreateShareLink();
 
@@ -75,6 +97,8 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
     setForm({ title: '', content: '', is_published: true });
     setMediaFile(null);
     setMediaPreviewUrl(null);
+    setPendingBlog(null);
+    submittingRef.current = false;
   }, [open]);
 
   useEffect(() => {
@@ -90,7 +114,12 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
   }, [mediaFile]);
 
   const handleClose = () => {
-    if (createBlogMutation.isPending || uploadMediaMutation.isPending || shareMutation.isPending) {
+    if (
+      createBlogMutation.isPending ||
+      updateBlogMutation.isPending ||
+      uploadMediaMutation.isPending ||
+      shareMutation.isPending
+    ) {
       return;
     }
     onClose();
@@ -118,6 +147,10 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) {
+      return;
+    }
+
     const titleTrim = form.title.trim();
     const contentTrim = form.content.trim();
     if (!titleTrim || !contentTrim) {
@@ -125,25 +158,60 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       return;
     }
 
+    submittingRef.current = true;
+    let failureStage: 'create' | 'upload' = 'create';
     try {
-      const createdBlog = await createBlogMutation.mutateAsync({
-        title: titleTrim,
-        content: contentTrim,
-        is_published: form.is_published,
-      });
+      let savedBlog = pendingBlog;
+
+      if (savedBlog) {
+        const needsUpdate =
+          savedBlog.title !== titleTrim ||
+          savedBlog.content !== contentTrim ||
+          savedBlog.is_published !== form.is_published;
+
+        if (needsUpdate) {
+          savedBlog = await updateBlogMutation.mutateAsync({
+            slug: savedBlog.slug,
+            title: titleTrim,
+            content: contentTrim,
+            is_published: form.is_published,
+          });
+        }
+      } else {
+        savedBlog = await createBlogMutation.mutateAsync({
+          title: titleTrim,
+          content: contentTrim,
+          is_published: form.is_published,
+        });
+      }
+
+      if (!savedBlog) {
+        throw new Error('Unable to save post.');
+      }
+
+      setPendingBlog(savedBlog);
 
       if (mediaFile) {
-        const mediaType = mediaTypeFromFile(mediaFile);
-        await uploadMediaMutation.mutateAsync({
-          blogId: createdBlog.id,
-          file: mediaFile,
-          mediaType,
-        });
+        failureStage = 'upload';
+        try {
+          const mediaType = mediaTypeFromFile(mediaFile);
+          await uploadMediaMutation.mutateAsync({
+            blogId: savedBlog.id,
+            file: mediaFile,
+            mediaType,
+          });
+        } catch (uploadErr) {
+          enqueueSnackbar(
+            `Your post was saved, but the attachment failed: ${getErrorMessage(uploadErr, 'upload')}`,
+            { variant: 'error', autoHideDuration: 10_000 },
+          );
+          return;
+        }
       }
 
       let shareUrl: string | undefined;
       try {
-        const share = await shareMutation.mutateAsync(createdBlog.slug);
+        const share = await shareMutation.mutateAsync(savedBlog.slug);
         shareUrl = share.public_url as string | undefined;
         if (shareUrl) {
           await navigator.clipboard.writeText(shareUrl).catch(() => {});
@@ -153,7 +221,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       }
 
       const published = Boolean(form.is_published);
-      const primary = published ? `Published: “${createdBlog.title}”.` : `Draft saved: “${createdBlog.title}”.`;
+      const primary = published ? `Published: “${savedBlog.title}”.` : `Draft saved: “${savedBlog.title}”.`;
       const secondary = shareUrl ? ' Share link copied to clipboard.' : '';
 
       enqueueSnackbar(`${primary}${secondary}`, {
@@ -167,7 +235,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
               size="small"
               onClick={() => {
                 closeSnackbar(key);
-                navigate(`/blogs/${createdBlog.slug}`);
+                navigate(`/blogs/${savedBlog.slug}`);
               }}
             >
               View post
@@ -179,13 +247,20 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
         ),
       });
 
+      setPendingBlog(null);
       onClose();
     } catch (err) {
-      enqueueSnackbar(getErrorMessage(err), { variant: 'error' });
+      enqueueSnackbar(getErrorMessage(err, failureStage), { variant: 'error' });
+    } finally {
+      submittingRef.current = false;
     }
   };
 
-  const busy = createBlogMutation.isPending || uploadMediaMutation.isPending || shareMutation.isPending;
+  const busy =
+    createBlogMutation.isPending ||
+    updateBlogMutation.isPending ||
+    uploadMediaMutation.isPending ||
+    shareMutation.isPending;
 
   return (
     <Dialog
@@ -216,6 +291,11 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Write here — your feed updates as soon as you publish.
           </Typography>
+          {pendingBlog ? (
+            <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.75, fontWeight: 600 }}>
+              Post saved — fix or remove the attachment, then publish again (no duplicate will be created).
+            </Typography>
+          ) : null}
         </Box>
         <IconButton aria-label="Close" onClick={handleClose} disabled={busy} size="small">
           <CloseRoundedIcon />

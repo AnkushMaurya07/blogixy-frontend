@@ -20,7 +20,7 @@ export function createBlogixyTheme(opts: {
       mode,
       primary: {
         main: primaryMain,
-        contrastText: mode === 'light' ? '#ffffff' : '#0b1220',
+        contrastText: '#ffffff',
       },
       secondary: {
         main: mode === 'light' ? '#5b6b82' : '#94a3b8',
