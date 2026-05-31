@@ -403,10 +403,13 @@ export const useToggleFollow = () => {
   return useMutation({
     mutationFn: async (userId: number) =>
       (await apiClient.post<{ following: boolean }>(`/auth/follows/${userId}/toggle/`)).data,
-    onSuccess: (_data, userId) => {
+    onSuccess: (data, userId) => {
+      queryClient.setQueryData<UserProfile>(['user-detail', userId], (old) =>
+        old ? { ...old, is_following: data.following } : old,
+      );
+      void queryClient.refetchQueries({ queryKey: ['user-detail', userId] });
       queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      queryClient.invalidateQueries({ queryKey: ['user-detail', userId] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -464,8 +467,9 @@ export const useUserDetail = (userId?: number) => {
   const token = useAppSelector((s) => s.auth.accessToken);
   return useQuery({
     queryKey: ['user-detail', userId],
-    queryFn: async () => (await apiClient.get(`/auth/users/${userId}/`)).data,
+    queryFn: async () => (await apiClient.get<UserProfile>(`/auth/users/${userId}/`)).data,
     enabled: Boolean(token) && Boolean(userId),
+    staleTime: 0,
   });
 };
 

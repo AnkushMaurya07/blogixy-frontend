@@ -26,18 +26,30 @@ import type { BlogPost } from '../api/types';
 import { blogPublicUrl, copyToClipboard } from '../utils/clipboard';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function getErrorMessage(err: unknown, stage: 'create' | 'upload' = 'create'): string {
   if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    if (status === 413) {
+      return stage === 'upload'
+        ? 'Upload rejected: file exceeds the server upload limit. Use an image under 10MB.'
+        : 'Request too large for the server.';
+    }
+
     if (!err.response) {
       if (err.code === 'ECONNABORTED') {
         return stage === 'upload'
-          ? 'Upload timed out. Try a smaller file or check your connection.'
+          ? 'Upload timed out. Try a smaller image or check your connection.'
           : 'Request timed out. Check your connection and try again.';
       }
       return stage === 'upload'
-        ? 'Could not upload the attachment. Check your connection and file size (10MB images, 20MB videos), then try again.'
+        ? 'Image upload failed. Check your connection and try an image under 10MB.'
         : 'Network error. Check your connection and try again.';
     }
 
@@ -60,14 +72,21 @@ function getErrorMessage(err: unknown, stage: 'create' | 'upload' = 'create'): s
   if (err instanceof Error && err.message !== 'Network Error') return err.message;
   if (err instanceof Error) {
     return stage === 'upload'
-      ? 'Could not upload the attachment. Check your connection and file size (10MB images, 20MB videos), then try again.'
+      ? 'Could not upload the image. Check your connection and use a file under 10MB.'
       : 'Network error. Check your connection and try again.';
   }
   return 'Something went wrong. Try again.';
 }
 
-function mediaTypeFromFile(file: File): 'image' | 'video' {
-  return file.type.startsWith('video/') ? 'video' : 'image';
+function isAllowedImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return Boolean(ext && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'heic', 'heif'].includes(ext));
+}
+
+function describeImageFile(file: File): string {
+  const mime = file.type || 'unknown MIME type';
+  return `Image · ${mime} · ${formatFileSize(file.size)}`;
 }
 
 type CreatePostModalProps = {
@@ -132,13 +151,16 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       setMediaFile(null);
       return;
     }
-    const mt = mediaTypeFromFile(file);
-    const max = mt === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-    if (file.size > max) {
-      enqueueSnackbar(
-        mt === 'video' ? 'Video must be 20MB or smaller.' : 'Image must be 10MB or smaller.',
-        { variant: 'warning' },
-      );
+    if (!isAllowedImageFile(file)) {
+      enqueueSnackbar('Only images are allowed (JPG, PNG, GIF, WebP, etc.). Videos are not supported.', {
+        variant: 'warning',
+      });
+      setMediaFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      enqueueSnackbar('Image must be 10MB or smaller.', { variant: 'warning' });
       setMediaFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
@@ -195,11 +217,10 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
       if (mediaFile) {
         failureStage = 'upload';
         try {
-          const mediaType = mediaTypeFromFile(mediaFile);
           await uploadMediaMutation.mutateAsync({
             blogId: savedBlog.id,
             file: mediaFile,
-            mediaType,
+            mediaType: 'image',
           });
         } catch (uploadErr) {
           enqueueSnackbar(
@@ -353,7 +374,7 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
               ref={fileInputRef}
               hidden
               type="file"
-              accept="image/*,video/*"
+              accept="image/*"
               onChange={(e) => onPickFile(e.target.files)}
             />
             <Box
@@ -386,15 +407,20 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
             >
               <CloudUploadRoundedIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Click to upload image or video
+                Click to upload an image
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                Type is detected from the file. Max 10MB images, 20MB videos.
+                JPG, PNG, GIF, or WebP — max 10MB. Videos are not supported.
               </Typography>
               {mediaFile ? (
-                <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 600 }} color="primary">
-                  {mediaFile.name} ({mediaTypeFromFile(mediaFile) === 'video' ? 'Video' : 'Image'})
-                </Typography>
+                <>
+                  <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 600 }} color="primary">
+                    {mediaFile.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    {describeImageFile(mediaFile)}
+                  </Typography>
+                </>
               ) : null}
               {mediaFile && mediaPreviewUrl ? (
                 <Box
@@ -408,23 +434,12 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {mediaTypeFromFile(mediaFile) === 'video' ? (
-                    <Box
-                      component="video"
-                      src={mediaPreviewUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      sx={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'contain', bgcolor: 'common.black' }}
-                    />
-                  ) : (
-                    <Box
-                      component="img"
-                      src={mediaPreviewUrl}
-                      alt=""
-                      sx={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'contain', verticalAlign: 'middle' }}
-                    />
-                  )}
+                  <Box
+                    component="img"
+                    src={mediaPreviewUrl}
+                    alt=""
+                    sx={{ width: '100%', maxHeight: 320, display: 'block', objectFit: 'contain', verticalAlign: 'middle' }}
+                  />
                 </Box>
               ) : null}
               {mediaFile ? (

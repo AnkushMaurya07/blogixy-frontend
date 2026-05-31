@@ -50,7 +50,6 @@ export default function BlogDetailPage() {
   const [receiverId, setReceiverId] = useState<number | ''>('');
   const [commentInput, setCommentInput] = useState('');
   const [liked, setLiked] = useState(false);
-  const [isFollowingAuthor, setIsFollowingAuthor] = useState(false);
 
   const blogQuery = useQuery({
     queryKey: ['blog-detail', slug],
@@ -84,20 +83,20 @@ export default function BlogDetailPage() {
   const createComment = useCreateComment(slug);
 
   const comments = (commentsQuery.data as { id: number; user_name: string; content: string }[] | undefined) ?? [];
+  const isFollowingAuthor = Boolean(authorQuery.data?.is_following);
 
   useEffect(() => {
     setLiked(Boolean(blog?.is_liked));
   }, [blog?.id, blog?.is_liked]);
 
-  useEffect(() => {
-    if (authorQuery.data) {
-      setIsFollowingAuthor(Boolean(authorQuery.data.is_following));
-    }
-  }, [authorQuery.data?.id, authorQuery.data?.is_following]);
-
-  const mediaItems = useMemo(() => blog?.media_items?.map((item) => ({ ...item, abs: absoluteMediaUrl(item.file) })) ?? [], [blog]);
-  const hasImageMedia = Boolean(blog?.media_items?.some((m) => m.media_type === 'image'));
-  const firstVideoHero = mediaItems.find((m) => m.media_type === 'video');
+  const mediaItems = useMemo(
+    () =>
+      blog?.media_items
+        ?.filter((item) => item.media_type === 'image')
+        .map((item) => ({ ...item, abs: absoluteMediaUrl(item.file) }))
+        .filter((item) => item.abs) ?? [],
+    [blog],
+  );
 
   if (!blog) {
     return (
@@ -113,22 +112,6 @@ export default function BlogDetailPage() {
         Back
       </Button>
       <Paper sx={{ p: 0, overflow: 'hidden', borderRadius: 4 }}>
-        {!hasImageMedia && firstVideoHero ? (
-          <Box
-            component="video"
-            controls
-            playsInline
-            preload="metadata"
-            src={firstVideoHero.abs}
-            sx={{
-              width: '100%',
-              display: 'block',
-              maxHeight: { xs: 280, sm: 360 },
-              objectFit: 'cover',
-              bgcolor: 'common.black',
-            }}
-          />
-        ) : null}
         <Stack spacing={2} sx={{ p: { xs: 2.5, md: 4 } }}>
           <Stack
             direction="row"
@@ -187,7 +170,6 @@ export default function BlogDetailPage() {
                   onClick={() => {
                     toggleFollow.mutate(blog.author, {
                       onSuccess: (data) => {
-                        setIsFollowingAuthor(Boolean(data.following));
                         enqueueSnackbar(data.following ? 'Following this user.' : 'Unfollowed.', {
                           variant: 'success',
                         });
@@ -224,11 +206,7 @@ export default function BlogDetailPage() {
             <Stack spacing={2}>
               {mediaItems.map((media) => (
                 <Box key={media.id}>
-                  {media.media_type === 'image' ? (
-                    <Box component="img" src={media.abs} loading="lazy" alt="blog-media" sx={{ width: '100%', borderRadius: 2 }} />
-                  ) : (
-                    <Box component="video" controls src={media.abs} sx={{ width: '100%', borderRadius: 2 }} />
-                  )}
+                  <Box component="img" src={media.abs} loading="lazy" alt="" sx={{ width: '100%', borderRadius: 2 }} />
                 </Box>
               ))}
             </Stack>

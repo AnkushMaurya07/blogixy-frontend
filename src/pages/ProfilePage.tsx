@@ -108,7 +108,6 @@ export default function ProfilePage() {
   const [bioDraft, setBioDraft] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-  const [isFollowing, setIsFollowing] = useState(false);
 
   const selfQuery = useProfile();
   const otherQuery = useUserDetail(userId ? Number(userId) : undefined);
@@ -131,6 +130,7 @@ export default function ProfilePage() {
 
   const posts = blogsQuery.data ?? [];
   const savedEntries = (favoritesQuery.data ?? []) as FavoriteEntry[];
+  const isFollowing = Boolean(viewingOther && profile?.is_following);
 
   useEffect(() => {
     if (profile && !viewingOther) {
@@ -139,12 +139,6 @@ export default function ProfilePage() {
       setBioDraft(profile.bio ?? '');
     }
   }, [profile?.id, profile?.username, profile?.profile_title, profile?.bio, viewingOther]);
-
-  useEffect(() => {
-    if (viewingOther && profile) {
-      setIsFollowing(Boolean(profile.is_following));
-    }
-  }, [profile?.id, profile?.is_following, viewingOther]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -295,7 +289,6 @@ export default function ProfilePage() {
                   onClick={() => {
                     toggleFollow.mutate(profile.id, {
                       onSuccess: (data) => {
-                        setIsFollowing(Boolean(data.following));
                         enqueueSnackbar(data.following ? 'Following this user.' : 'Unfollowed.', {
                           variant: 'success',
                         });

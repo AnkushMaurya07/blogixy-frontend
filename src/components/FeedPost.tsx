@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
-import { firstBlogImageUrl, firstBlogVideoUrl, userAvatarUrl } from '../api/mediaUrl';
+import { firstBlogImageUrl, userAvatarUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 function formatRelativeTime(iso?: string): string {
@@ -45,9 +45,8 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
   useEffect(() => {
     setFavorited(Boolean(blog.is_favorited));
   }, [blog.id, blog.is_favorited]);
-  const videoSrc = firstBlogVideoUrl(blog.media_items);
   const imageSrc = firstBlogImageUrl(blog.media_items);
-  const hasMedia = Boolean(videoSrc || imageSrc);
+  const hasMedia = Boolean(imageSrc);
   const relative = formatRelativeTime(blog.created_at);
   const avatarSrc = userAvatarUrl({
     id: blog.author,
@@ -200,36 +199,19 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
                     bgcolor: alpha(theme.palette.common.black, theme.palette.mode === 'light' ? 0.04 : 0.25),
                   }}
                 >
-                  {videoSrc ? (
-                    <Box
-                      component="video"
-                      src={videoSrc}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      sx={{
-                        width: '100%',
-                        display: 'block',
-                        maxHeight: { xs: 280, sm: 360 },
-                        objectFit: 'cover',
-                        bgcolor: 'common.black',
-                      }}
-                    />
-                  ) : (
-                    <Box
-                      component="img"
-                      loading="lazy"
-                      decoding="async"
-                      src={imageSrc}
-                      alt=""
-                      sx={{
-                        width: '100%',
-                        display: 'block',
-                        objectFit: 'cover',
-                        maxHeight: { xs: 280, sm: 360 },
-                      }}
-                    />
-                  )}
+                  <Box
+                    component="img"
+                    loading="lazy"
+                    decoding="async"
+                    src={imageSrc}
+                    alt=""
+                    sx={{
+                      width: '100%',
+                      display: 'block',
+                      objectFit: 'cover',
+                      maxHeight: { xs: 280, sm: 360 },
+                    }}
+                  />
                 </Box>
               </RouterLink>
             ) : null}

@@ -37,7 +37,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import BlogCommentsPanel from '../components/BlogCommentsPanel';
 import PageShell from '../components/PageShell';
 import { useInfiniteExploreBlogs, useToggleFavorite, useToggleLike } from '../api/hooks';
-import { firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
+import { firstBlogImageUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 import { useAppSelector } from '../features/auth/hooks';
 import { useDebouncedValue } from '../utils/useDebouncedValue';
@@ -245,23 +245,7 @@ export default function ExplorePage() {
                         {blog.title}
                       </Box>
                     </Typography>
-                    {firstBlogVideoUrl(blog.media_items) ? (
-                      <Box
-                        component="video"
-                        src={firstBlogVideoUrl(blog.media_items)}
-                        controls
-                        muted
-                        playsInline
-                        preload="metadata"
-                        sx={{
-                          width: '100%',
-                          maxHeight: 200,
-                          borderRadius: 2,
-                          bgcolor: 'common.black',
-                          objectFit: 'cover',
-                        }}
-                      />
-                    ) : firstBlogImageUrl(blog.media_items) ? (
+                    {firstBlogImageUrl(blog.media_items) ? (
                       <Box
                         component="img"
                         src={firstBlogImageUrl(blog.media_items)}

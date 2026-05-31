@@ -7,7 +7,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 
-import { firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
+import { firstBlogImageUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 type BlogCardProps = {
@@ -17,9 +17,8 @@ type BlogCardProps = {
 
 export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
   const theme = useTheme();
-  const videoSrc = firstBlogVideoUrl(blog.media_items);
   const imageSrc = firstBlogImageUrl(blog.media_items);
-  const hasMedia = Boolean(videoSrc || imageSrc);
+  const hasMedia = Boolean(imageSrc);
 
   return (
     <motion.article
@@ -55,25 +54,14 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
             }}
           >
-            {videoSrc ? (
-              <Box
-                component="video"
-                src={videoSrc}
-                controls
-                playsInline
-                preload="metadata"
-                sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover', bgcolor: 'common.black' }}
-              />
-            ) : (
-              <Box
-                component="img"
-                loading="lazy"
-                decoding="async"
-                src={imageSrc}
-                alt=""
-                sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
-              />
-            )}
+            <Box
+              component="img"
+              loading="lazy"
+              decoding="async"
+              src={imageSrc}
+              alt=""
+              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
+            />
           </Box>
         ) : null}
         <CardContent sx={{ flexGrow: 1, pt: 2.5, pb: 1 }}>
