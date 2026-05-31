@@ -7,7 +7,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { Link as RouterLink } from 'react-router-dom';
 
-import { blogCoverImageUrl, firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
+import { firstBlogImageUrl, firstBlogVideoUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
 
 type BlogCardProps = {
@@ -17,9 +17,9 @@ type BlogCardProps = {
 
 export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
   const theme = useTheme();
-  const cover = blogCoverImageUrl(blog, { width: 800, height: 450 });
   const videoSrc = firstBlogVideoUrl(blog.media_items);
   const imageSrc = firstBlogImageUrl(blog.media_items);
+  const hasMedia = Boolean(videoSrc || imageSrc);
 
   return (
     <motion.article
@@ -46,34 +46,36 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               : 'linear-gradient(170deg,#151c2b,#141b29)',
         }}
       >
-        <Box
-          sx={{
-            lineHeight: 0,
-            maxHeight: 220,
-            overflow: 'hidden',
-            borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
-          }}
-        >
-          {videoSrc ? (
-            <Box
-              component="video"
-              src={videoSrc}
-              controls
-              playsInline
-              preload="metadata"
-              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover', bgcolor: 'common.black' }}
-            />
-          ) : (
-            <Box
-              component="img"
-              loading="lazy"
-              decoding="async"
-              src={imageSrc ?? cover}
-              alt=""
-              sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
-            />
-          )}
-        </Box>
+        {hasMedia ? (
+          <Box
+            sx={{
+              lineHeight: 0,
+              maxHeight: 220,
+              overflow: 'hidden',
+              borderBottom: `1px solid ${alpha(theme.palette.divider ?? '#000', 0.08)}`,
+            }}
+          >
+            {videoSrc ? (
+              <Box
+                component="video"
+                src={videoSrc}
+                controls
+                playsInline
+                preload="metadata"
+                sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover', bgcolor: 'common.black' }}
+              />
+            ) : (
+              <Box
+                component="img"
+                loading="lazy"
+                decoding="async"
+                src={imageSrc}
+                alt=""
+                sx={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }}
+              />
+            )}
+          </Box>
+        ) : null}
         <CardContent sx={{ flexGrow: 1, pt: 2.5, pb: 1 }}>
           <Stack spacing={1.75}>
             <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>

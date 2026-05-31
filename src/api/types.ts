@@ -74,6 +74,8 @@ export type UserProfile = {
   profile_title?: string;
   bio?: string;
   avatar?: string | null;
+  /** Present when viewing another user while signed in. */
+  is_following?: boolean;
 };
 
 /** Paginated home timeline (following + discover merged for auth users). */

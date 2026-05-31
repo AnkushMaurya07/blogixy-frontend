@@ -1,5 +1,15 @@
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { Alert, Button, Divider, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import {
+  Alert,
+  Button,
+  CircularProgress,
+  Divider,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { AnimatePresence, motion } from 'framer-motion';
 import axios from 'axios';
@@ -34,18 +44,25 @@ export default function AuthPage() {
     role: 'reader',
   });
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
+  const busy = submitting || loginMutation.isPending || registerMutation.isPending;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setSuccessMessage('');
+    setSubmitting(true);
     try {
       if (isRegister) {
         await registerMutation.mutateAsync(form);
+        setSuccessMessage('Registration successful! Signing you in…');
+        await new Promise((resolve) => window.setTimeout(resolve, 900));
       }
       const loginResult = (await loginMutation.mutateAsync({
         username: form.username,
@@ -62,6 +79,7 @@ export default function AuthPage() {
       }
       navigate(nextPath, { replace: true });
     } catch (error) {
+      setSuccessMessage('');
       if (axios.isAxiosError(error) && error.response?.data) {
         const data = error.response.data as Record<string, string[] | string>;
         const firstKey = Object.keys(data)[0];
@@ -71,6 +89,8 @@ export default function AuthPage() {
       } else {
         setErrorMessage('Something went wrong. Please try again.');
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -128,6 +148,7 @@ export default function AuthPage() {
                     label="Username"
                     autoComplete="username"
                     required
+                    disabled={busy}
                     value={form.username}
                     onChange={(event) => setForm({ ...form, username: event.target.value })}
                   />
@@ -139,6 +160,7 @@ export default function AuthPage() {
                         autoComplete="email"
                         required
                         type="email"
+                        disabled={busy}
                         value={form.email}
                         onChange={(event) => setForm({ ...form, email: event.target.value })}
                       />
@@ -146,6 +168,7 @@ export default function AuthPage() {
                         variant="filled"
                         label="Org role"
                         select
+                        disabled={busy}
                         value={form.role}
                         onChange={(event) => setForm({ ...form, role: event.target.value as RoleType })}
                       >
@@ -161,16 +184,37 @@ export default function AuthPage() {
                     type="password"
                     autoComplete="current-password"
                     required
+                    disabled={busy}
                     value={form.password}
                     onChange={(event) => setForm({ ...form, password: event.target.value })}
                   />
+                  {successMessage ? (
+                    <Alert severity="success" sx={{ mt: -0.5 }}>
+                      {successMessage}
+                    </Alert>
+                  ) : null}
                   {errorMessage ? (
                     <Alert severity="error" sx={{ mt: -0.5 }}>
                       {errorMessage}
                     </Alert>
                   ) : null}
-                  <Button variant="contained" size="large" type="submit" sx={{ py: 1.5, mt: 0.5 }}>
-                    {isRegister ? 'Create account & sign in' : 'Sign in'}
+                  <Button
+                    variant="contained"
+                    size="large"
+                    type="submit"
+                    disabled={busy}
+                    startIcon={busy ? <CircularProgress size={20} color="inherit" /> : undefined}
+                    sx={{ py: 1.5, mt: 0.5 }}
+                  >
+                    {busy
+                      ? isRegister
+                        ? successMessage
+                          ? 'Signing you in…'
+                          : 'Creating account…'
+                        : 'Signing in…'
+                      : isRegister
+                        ? 'Create account & sign in'
+                        : 'Sign in'}
                   </Button>
                 </Stack>
               </form>
@@ -179,8 +223,10 @@ export default function AuthPage() {
                 variant="text"
                 fullWidth
                 sx={{ typography: 'body2', fontWeight: 650 }}
+                disabled={busy}
                 onClick={() => {
                   setErrorMessage('');
+                  setSuccessMessage('');
                   setIsRegister(!isRegister);
                 }}
               >

@@ -171,7 +171,7 @@ export default function HomePage() {
               elevation={0}
               sx={{
                 borderRadius: { xs: 0, sm: 3 },
-                overflow: 'hidden',
+                overflow: 'visible',
                 border: { xs: 'none', sm: 'none' },
                 bgcolor: 'background.paper',
                 mx: { xs: -2.5, sm: 0 },
@@ -180,14 +180,14 @@ export default function HomePage() {
               <Box
                   sx={{
                     px: 2.25,
-                    pt: { xs: 0.25, sm: 0.5 },
-                    pb: 1.25,
+                    pt: { xs: 1, sm: 1.25 },
+                    pb: token ? 1.25 : 2,
                     borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                   position: 'sticky',
                   top: { md: 72 },
-                  zIndex: 2,
-                  bgcolor: alpha(theme.palette.background.paper, 0.92),
-                  backdropFilter: 'blur(12px)',
+                  zIndex: 3,
+                  bgcolor: 'background.paper',
+                  boxShadow: `0 1px 0 ${alpha(theme.palette.divider, 0.08)}`,
                 }}
               >
                 <Box
@@ -368,7 +368,7 @@ export default function HomePage() {
               ) : null}
 
               {token ? (
-                <Box>
+                <Box sx={{ overflow: 'visible' }}>
                   <Tabs
                     value={feedTab}
                     onChange={(_, v: number) => {
@@ -378,6 +378,7 @@ export default function HomePage() {
                     sx={{
                       minHeight: 48,
                       borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      bgcolor: 'background.paper',
                       '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 48 },
                     }}
                   >
@@ -393,17 +394,14 @@ export default function HomePage() {
                         '& .MuiLinearProgress-bar': { borderRadius: 0 },
                       }}
                     />
-                  ) : (
-                    <Box sx={{ height: 2 }} aria-hidden />
-                  )}
+                  ) : null}
                 </Box>
               ) : null}
 
               <Box
                 sx={{
                   px: { xs: 0, sm: 0 },
-                  /* Theme spacing: smaller when signed out (no tabs); room under tabs when signed in */
-                  pt: token ? 2 : 1,
+                  pt: token ? 0 : 1.5,
                 }}
               >
                 {feedError ? (
@@ -492,7 +490,7 @@ export default function HomePage() {
                         No favourites yet
                       </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 400, mx: 'auto', lineHeight: 1.65 }}>
-                        Tap the bookmark on any post to save it here. Home shows everyone’s public posts in one stream.
+                        Tap the bookmark on any post to save it here. Home shows your posts and everyone&apos;s public posts in one stream.
                       </Typography>
                       <Button component={RouterLink} to="/explore" variant="contained" size="small">
                         Browse posts
@@ -640,7 +638,7 @@ export default function HomePage() {
             >
               <Typography variant="caption" color="text.secondary">
                 <Chip label="Tips" size="small" sx={{ mr: 0.75, height: 22 }} />
-                One feed mixes all authors (except your posts). Save posts to the Saved tab with the bookmark.
+                One feed mixes your posts and everyone else&apos;s. Save posts to the Saved tab with the bookmark.
               </Typography>
             </Paper>
           </Box>

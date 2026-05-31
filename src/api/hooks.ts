@@ -401,10 +401,12 @@ export const useFollowUser = () => {
 export const useToggleFollow = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (userId: number) => (await apiClient.post(`/auth/follows/${userId}/toggle/`)).data,
-    onSuccess: () => {
+    mutationFn: async (userId: number) =>
+      (await apiClient.post<{ following: boolean }>(`/auth/follows/${userId}/toggle/`)).data,
+    onSuccess: (_data, userId) => {
       queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user-detail', userId] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'home-feed'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },

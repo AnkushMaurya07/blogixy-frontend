@@ -1,5 +1,7 @@
 import CameraAltRoundedIcon from '@mui/icons-material/CameraAltRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
+import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
+import PersonRemoveAlt1RoundedIcon from '@mui/icons-material/PersonRemoveAlt1Rounded';
 import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import {
@@ -26,6 +28,7 @@ import {
   useFavoriteBlogs,
   useProfile,
   useToggleFavorite,
+  useToggleFollow,
   useToggleLike,
   useUpdateProfile,
   useUserBlogs,
@@ -105,6 +108,7 @@ export default function ProfilePage() {
   const [bioDraft, setBioDraft] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   const selfQuery = useProfile();
   const otherQuery = useUserDetail(userId ? Number(userId) : undefined);
@@ -117,6 +121,7 @@ export default function ProfilePage() {
   const favoritesQuery = useFavoriteBlogs();
   const toggleLike = useToggleLike();
   const toggleFavorite = useToggleFavorite();
+  const toggleFollow = useToggleFollow();
   const updateProfile = useUpdateProfile();
 
   const nameCheck = useUsernameAvailability(usernameDraft, profile?.username ?? '');
@@ -134,6 +139,12 @@ export default function ProfilePage() {
       setBioDraft(profile.bio ?? '');
     }
   }, [profile?.id, profile?.username, profile?.profile_title, profile?.bio, viewingOther]);
+
+  useEffect(() => {
+    if (viewingOther && profile) {
+      setIsFollowing(Boolean(profile.is_following));
+    }
+  }, [profile?.id, profile?.is_following, viewingOther]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -275,16 +286,38 @@ export default function ProfilePage() {
                 {profile.profile_title || 'Blogixy member'}
               </Typography>
             </Box>
-            {viewingOther && token && profile.id ? (
-              <Button
-                component={RouterLink}
-                to={`/messages?with=${profile.id}`}
-                variant="contained"
-                startIcon={<ChatRoundedIcon />}
-                sx={{ alignSelf: { xs: 'stretch', sm: 'center' } }}
-              >
-                Message
-              </Button>
+            {viewingOther && token && profile.id && selfQuery.data?.id !== profile.id ? (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignSelf: { xs: 'stretch', sm: 'center' } }}>
+                <Button
+                  variant={isFollowing ? 'outlined' : 'contained'}
+                  startIcon={isFollowing ? <PersonRemoveAlt1RoundedIcon /> : <PersonAddAlt1RoundedIcon />}
+                  disabled={toggleFollow.isPending}
+                  onClick={() => {
+                    toggleFollow.mutate(profile.id, {
+                      onSuccess: (data) => {
+                        setIsFollowing(Boolean(data.following));
+                        enqueueSnackbar(data.following ? 'Following this user.' : 'Unfollowed.', {
+                          variant: 'success',
+                        });
+                      },
+                      onError: () => {
+                        enqueueSnackbar('Could not update follow status.', { variant: 'error' });
+                      },
+                    });
+                  }}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {toggleFollow.isPending ? 'Updating…' : isFollowing ? 'Unfollow' : 'Follow'}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to={`/messages?with=${profile.id}`}
+                  variant="outlined"
+                  startIcon={<ChatRoundedIcon />}
+                >
+                  Message
+                </Button>
+              </Stack>
             ) : null}
           </Stack>
           <Stack sx={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1, mt: 2 }}>

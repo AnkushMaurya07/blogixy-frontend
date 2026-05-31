@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useCreateBlog, useCreateShareLink, useUpdateBlog, useUploadBlogMedia } from '../api/hooks';
 import type { BlogPost } from '../api/types';
+import { blogPublicUrl, copyToClipboard } from '../utils/clipboard';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
@@ -211,11 +212,9 @@ export default function CreatePostModal({ open, onClose }: CreatePostModalProps)
 
       let shareUrl: string | undefined;
       try {
-        const share = await shareMutation.mutateAsync(savedBlog.slug);
-        shareUrl = share.public_url as string | undefined;
-        if (shareUrl) {
-          await navigator.clipboard.writeText(shareUrl).catch(() => {});
-        }
+        await shareMutation.mutateAsync(savedBlog.slug).catch(() => undefined);
+        shareUrl = blogPublicUrl(savedBlog.slug);
+        await copyToClipboard(shareUrl);
       } catch {
         /* share link is optional */
       }

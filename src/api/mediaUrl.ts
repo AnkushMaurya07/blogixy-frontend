@@ -1,4 +1,4 @@
-import type { BlogMediaItem, BlogPost } from './types';
+import type { BlogMediaItem } from './types';
 
 /** Host for Django media/static (strip `/api` from API origin). */
 const API_BASE = import.meta.env.VITE_API_ORIGIN ?? 'http://127.0.0.1:8000';
@@ -44,20 +44,4 @@ export function firstBlogVideoUrl(items: BlogMediaItem[] | undefined): string | 
 /** First image attachment URL, if any. */
 export function firstBlogImageUrl(items: BlogMediaItem[] | undefined): string | undefined {
   return absoluteMediaUrl(firstImageFile(items));
-}
-
-/**
- * Cover image for cards and heroes: real upload when present, otherwise a stable random-looking
- * photo per post (Picsum seeded URL — same id/slug always maps to the same image).
- */
-export function blogCoverImageUrl(
-  blog: Pick<BlogPost, 'id' | 'slug' | 'media_items'>,
-  size: { width: number; height: number } = { width: 800, height: 450 },
-): string {
-  const uploaded = absoluteMediaUrl(firstImageFile(blog.media_items));
-  if (uploaded) {
-    return uploaded;
-  }
-  const seed = `blogixy-${blog.id}-${blog.slug}`;
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${size.width}/${size.height}`;
 }
