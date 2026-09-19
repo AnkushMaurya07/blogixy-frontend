@@ -27,3 +27,7 @@ export async function copyToClipboard(text: string): Promise<void> {
 export function blogPublicUrl(slug: string): string {
   return `${window.location.origin}/blogs/${slug}`;
 }
+
+export function sharedBlogPublicUrl(token: string): string {
+  return `${window.location.origin}/shared/${token}`;
+}

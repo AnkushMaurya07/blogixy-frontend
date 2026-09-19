@@ -66,6 +66,13 @@ export type BlogPost = {
   updated_at?: string;
 };
 
+export type ShareLinkResponse = {
+  id: number;
+  token: string;
+  public_url?: string;
+  created_at: string;
+};
+
 export type UserProfile = {
   id: number;
   username: string;

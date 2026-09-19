@@ -39,7 +39,7 @@ import PageShell from '../components/PageShell';
 import { useAppSelector } from '../features/auth/hooks';
 import { apiClient } from '../api/client';
 import { useQuery } from '@tanstack/react-query';
-import { blogPublicUrl, copyToClipboard } from '../utils/clipboard';
+import { blogPublicUrl, copyToClipboard, sharedBlogPublicUrl } from '../utils/clipboard';
 
 export default function BlogDetailPage() {
   const { slug = '' } = useParams();
@@ -237,10 +237,11 @@ export default function BlogDetailPage() {
               startIcon={<ShareRoundedIcon />}
               disabled={createShare.isPending}
               onClick={async () => {
-                const url = blogPublicUrl(slug);
                 try {
+                  let url = blogPublicUrl(slug);
                   if (token) {
-                    await createShare.mutateAsync(slug).catch(() => undefined);
+                    const share = await createShare.mutateAsync(slug).catch(() => undefined);
+                    if (share?.token) url = sharedBlogPublicUrl(share.token);
                   }
                   await copyToClipboard(url);
                   enqueueSnackbar('Link copied to clipboard.', { variant: 'success' });

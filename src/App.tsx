@@ -12,6 +12,7 @@ import { useAppSelector } from './features/auth/hooks';
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ExplorePage = lazy(() => import('./pages/ExplorePage'));
 const BlogDetailPage = lazy(() => import('./pages/BlogDetailPage'));
+const SharedBlogPage = lazy(() => import('./pages/SharedBlogPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
@@ -34,6 +35,7 @@ function AppRoutes() {
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/blogs/:slug" element={<BlogDetailPage />} />
+          <Route path="/shared/:token" element={<SharedBlogPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route
             path="/profile"

@@ -10,6 +10,7 @@ import type {
   FavoriteEntry,
   PaginatedHomeFeedResponse,
   RegisterPayload,
+  ShareLinkResponse,
   UserProfile,
 } from './types';
 
@@ -253,7 +254,15 @@ export const useUploadBlogMedia = () =>
 
 export const useCreateShareLink = () =>
   useMutation({
-    mutationFn: async (slug: string) => (await apiClient.post(`/blogs/${slug}/share/`)).data,
+    mutationFn: async (slug: string) =>
+      (await apiClient.post<ShareLinkResponse>(`/blogs/${slug}/share/`)).data,
+  });
+
+export const useSharedBlog = (token: string) =>
+  useQuery({
+    queryKey: ['shared-blog', token],
+    queryFn: async () => (await apiClient.get<BlogPost>(`/blogs/shared/${token}/`)).data,
+    enabled: Boolean(token),
   });
 
 export const useSendBlogToUsers = () =>
