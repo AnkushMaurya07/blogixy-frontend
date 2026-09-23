@@ -32,7 +32,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import BlogCommentsPanel from '../components/BlogCommentsPanel';
 import PageShell from '../components/PageShell';
@@ -44,6 +44,7 @@ import { useDebouncedValue } from '../utils/useDebouncedValue';
 import { useThrottleFn } from '../utils/useThrottleFn';
 
 export default function ExplorePage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput, 320);
@@ -239,9 +240,21 @@ export default function ExplorePage() {
                     boxShadow: `0 20px 60px rgba(12,52,138, ${theme.palette.mode === 'light' ? 0.08 : 0.28})`,
                   })}
                 >
-                  <Stack spacing={1}>
+                  <Stack
+                    spacing={1}
+                    onClick={() => navigate(`/blogs/${blog.slug}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        navigate(`/blogs/${blog.slug}`);
+                      }
+                    }}
+                    role="link"
+                    tabIndex={0}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <Typography variant="h6">
-                      <Box component={Link} to={`/blogs/${blog.slug}`} sx={{ color: 'inherit', textDecoration: 'none' }}>
+                      <Box component={Link} to={`/blogs/${blog.slug}`} onClick={(event) => event.stopPropagation()} sx={{ color: 'inherit', textDecoration: 'none' }}>
                         {blog.title}
                       </Box>
                     </Typography>
@@ -312,9 +325,6 @@ export default function ExplorePage() {
                       </Tooltip>
                     ) : null}
                   </Stack>
-                  <Button component={Link} to={`/blogs/${blog.slug}`} variant="contained" size="small" sx={{ mt: 'auto', alignSelf: 'flex-start' }}>
-                    Read full post
-                  </Button>
                   <BlogCommentsPanel slug={blog.slug} />
                 </Paper>
               </motion.article>

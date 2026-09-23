@@ -7,7 +7,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { Avatar, Box, ButtonBase, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 import { firstBlogImageUrl, userAvatarUrl } from '../api/mediaUrl';
@@ -36,6 +36,7 @@ type FeedPostProps = {
 
 export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDivider = true }: FeedPostProps) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [likeBurst, setLikeBurst] = useState(false);
   const [liked, setLiked] = useState(Boolean(blog.is_liked));
   const [favorited, setFavorited] = useState(Boolean(blog.is_favorited));
@@ -68,6 +69,8 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
     onFavoriteToggle();
   };
 
+  const openPost = () => navigate(`/blogs/${blog.slug}`);
+
   return (
     <motion.article
       layout
@@ -78,6 +81,15 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
     >
       <Paper
         elevation={0}
+        onClick={openPost}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openPost();
+          }
+        }}
+        role="link"
+        tabIndex={0}
         sx={{
           p: { xs: 1.75, sm: 2 },
           borderRadius: 0,
@@ -88,6 +100,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
           '&:hover': {
             bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.035 : 0.065),
           },
+          cursor: 'pointer',
         }}
       >
         <Stack spacing={1.5} sx={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -117,6 +130,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
               <Typography
                 component={RouterLink}
                 to={`/users/${blog.author}`}
+                onClick={(event) => event.stopPropagation()}
                 variant="body2"
                 sx={{
                   fontWeight: 700,
@@ -152,6 +166,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
             <Typography
               component={RouterLink}
               to={`/blogs/${blog.slug}`}
+              onClick={(event) => event.stopPropagation()}
               variant="subtitle1"
               sx={{
                 fontWeight: 800,
@@ -189,7 +204,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
             </Typography>
 
             {hasMedia ? (
-              <RouterLink to={`/blogs/${blog.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+              <RouterLink to={`/blogs/${blog.slug}`} onClick={(event) => event.stopPropagation()} style={{ textDecoration: 'none', display: 'block' }}>
                 <Box
                   sx={{
                     borderRadius: 3,
@@ -231,6 +246,7 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
               <ButtonBase
                 component={RouterLink}
                 to={`/blogs/${blog.slug}`}
+                onClick={(event) => event.stopPropagation()}
                 aria-label={`Open post — ${blog.comments_count} comments`}
                 sx={{
                   display: 'inline-flex',
@@ -273,7 +289,10 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
               <Box sx={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'center', gap: 0.25 }}>
                 <IconButton
                   size="small"
-                  onClick={handleLike}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleLike();
+                  }}
                   disabled={!onLikeToggle}
                   aria-label={liked ? 'Unlike post' : 'Like post'}
                   sx={{
@@ -301,7 +320,10 @@ export default function FeedPost({ blog, onLikeToggle, onFavoriteToggle, showDiv
               {onFavoriteToggle ? (
                 <IconButton
                   size="small"
-                  onClick={handleFavorite}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleFavorite();
+                  }}
                   aria-label={favorited ? 'Remove from favourites' : 'Add to favourites'}
                   sx={{
                     borderRadius: 99,

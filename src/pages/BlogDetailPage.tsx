@@ -1,5 +1,7 @@
 import BookmarkAddedRoundedIcon from '@mui/icons-material/BookmarkAddedRounded';
 import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
@@ -12,11 +14,19 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
-  MenuItem,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
@@ -50,6 +60,7 @@ export default function BlogDetailPage() {
   const [receiverId, setReceiverId] = useState<number | ''>('');
   const [commentInput, setCommentInput] = useState('');
   const [liked, setLiked] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const blogQuery = useQuery({
     queryKey: ['blog-detail', slug],
@@ -232,58 +243,89 @@ export default function BlogDetailPage() {
             >
               {blog.is_favorited ? 'Saved' : 'Save to favourites'}
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<ShareRoundedIcon />}
-              disabled={createShare.isPending}
-              onClick={async () => {
-                try {
-                  let url = blogPublicUrl(slug);
-                  if (token) {
-                    const share = await createShare.mutateAsync(slug).catch(() => undefined);
-                    if (share?.token) url = sharedBlogPublicUrl(share.token);
-                  }
-                  await copyToClipboard(url);
-                  enqueueSnackbar('Link copied to clipboard.', { variant: 'success' });
-                } catch {
-                  enqueueSnackbar('Could not copy link. Try again.', { variant: 'error' });
-                }
-              }}
-            >
-              Copy share link
-            </Button>
+            <Tooltip title="Share post">
+              <IconButton
+                aria-label="Share post"
+                color="primary"
+                disabled={createShare.isPending}
+                onClick={() => setShareOpen(true)}
+              >
+                <ShareRoundedIcon />
+              </IconButton>
+            </Tooltip>
           </Stack>
 
-          {token && (
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700 }}>
-                Send to a friend/followed user
-              </Typography>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                sx={{ alignItems: { xs: 'stretch', sm: 'flex-end' } }}
+          <Dialog open={shareOpen} onClose={() => !sendBlog.isPending && setShareOpen(false)} fullWidth maxWidth="sm">
+            <DialogTitle sx={{ pr: 6, fontWeight: 800 }}>
+              Share this post
+              <IconButton
+                aria-label="Close share dialog"
+                onClick={() => setShareOpen(false)}
+                disabled={sendBlog.isPending}
+                sx={{ position: 'absolute', right: 12, top: 12 }}
               >
-                <TextField
-                  select
-                  label="User"
-                  value={receiverId}
-                  onChange={(e) => setReceiverId(Number(e.target.value))}
-                  sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
+                <CloseRoundedIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {token ? (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                    Send to a friend
+                  </Typography>
+                  <List disablePadding sx={{ mb: 2, maxHeight: 220, overflowY: 'auto' }}>
+                    {((usersQuery.data as { id: number; username: string }[] | undefined) ?? []).map((user) => (
+                      <ListItemButton
+                        key={user.id}
+                        selected={receiverId === user.id}
+                        onClick={() => setReceiverId(user.id)}
+                        sx={{ borderRadius: 2, mb: 0.5 }}
+                      >
+                        <ListItemText primary={`@${user.username}`} secondary={receiverId === user.id ? 'Selected' : undefined} />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                  {usersQuery.isLoading ? <Typography color="text.secondary">Loading suggestions...</Typography> : null}
+                  {!usersQuery.isLoading && !usersQuery.data?.length ? (
+                    <Typography color="text.secondary" sx={{ mb: 2 }}>No friends available yet.</Typography>
+                  ) : null}
+                  <TextField
+                    fullWidth
+                    label="Message"
+                    value={shareContent}
+                    onChange={(e) => setShareContent(e.target.value)}
+                    multiline
+                    minRows={2}
+                  />
+                </>
+              ) : (
+                <Typography color="text.secondary">Sign in to send this post to friends.</Typography>
+              )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: 'wrap' }}>
+              <Tooltip title="Copy public link">
+                <Button
+                  variant="outlined"
+                  startIcon={<ContentCopyRoundedIcon />}
+                  disabled={createShare.isPending}
+                  onClick={async () => {
+                    try {
+                      let url = blogPublicUrl(slug);
+                      if (token) {
+                        const share = await createShare.mutateAsync(slug).catch(() => undefined);
+                        if (share?.token) url = sharedBlogPublicUrl(share.token);
+                      }
+                      await copyToClipboard(url);
+                      enqueueSnackbar('Link copied to clipboard.', { variant: 'success' });
+                    } catch {
+                      enqueueSnackbar('Could not copy link. Try again.', { variant: 'error' });
+                    }
+                  }}
                 >
-                  <MenuItem value="">Choose user</MenuItem>
-                  {((usersQuery.data as { id: number; username: string }[] | undefined) ?? []).map((user) => (
-                    <MenuItem key={user.id} value={user.id}>
-                      {user.username}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  label="Message"
-                  value={shareContent}
-                  onChange={(e) => setShareContent(e.target.value)}
-                  sx={{ flex: 1, minWidth: 0, width: { xs: '100%', sm: 'auto' } }}
-                />
+                  Copy link
+                </Button>
+              </Tooltip>
+              {token ? (
                 <Button
                   variant="contained"
                   startIcon={<SendRoundedIcon />}
@@ -296,30 +338,18 @@ export default function BlogDetailPage() {
                         onSuccess: () => {
                           enqueueSnackbar('Post sent.', { variant: 'success' });
                           setReceiverId('');
+                          setShareOpen(false);
                         },
-                        onError: () => {
-                          enqueueSnackbar('Could not send post. Try again.', { variant: 'error' });
-                        },
+                        onError: () => enqueueSnackbar('Could not send post. Try again.', { variant: 'error' }),
                       },
                     );
-                  }}
-                  sx={{
-                    flexShrink: 0,
-                    alignSelf: { xs: 'stretch', sm: 'auto' },
-                    minWidth: { sm: 132 },
-                    height: 56,
-                    px: 2.5,
-                    textTransform: 'none',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    '& .MuiButton-startIcon': { mr: 1 },
                   }}
                 >
                   {sendBlog.isPending ? 'Sending…' : 'Send'}
                 </Button>
-              </Stack>
-            </Paper>
-          )}
+              ) : null}
+            </DialogActions>
+          </Dialog>
 
           <Divider />
           <Typography variant="h6">Comments</Typography>

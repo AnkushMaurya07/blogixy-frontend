@@ -5,7 +5,7 @@ import ModeCommentRoundedIcon from '@mui/icons-material/ModeCommentRounded';
 import { Box, Button, Card, CardActions, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import { firstBlogImageUrl } from '../api/mediaUrl';
 import type { BlogPost } from '../api/types';
@@ -17,8 +17,10 @@ type BlogCardProps = {
 
 export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const imageSrc = firstBlogImageUrl(blog.media_items);
   const hasMedia = Boolean(imageSrc);
+  const openPost = () => navigate(`/blogs/${blog.slug}`);
 
   return (
     <motion.article
@@ -28,6 +30,15 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
       style={{ height: '100%' }}
     >
       <Card
+        onClick={openPost}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openPost();
+          }
+        }}
+        role="link"
+        tabIndex={0}
         sx={{
           height: '100%',
           borderRadius: 3,
@@ -39,6 +50,7 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               ? '0 12px 50px rgba(23,52,117,0.08)'
               : '0 18px 64px rgba(1, 5, 10, 0.6)',
           overflow: 'hidden',
+          cursor: 'pointer',
           backgroundImage:
             theme.palette.mode === 'light'
               ? 'linear-gradient(160deg,#ffffff,#f9fbfe)'
@@ -71,6 +83,7 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
                 <Box
                   component={RouterLink}
                   to={`/blogs/${blog.slug}`}
+                  onClick={(event) => event.stopPropagation()}
                   sx={{ textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}
                 >
                   {blog.title}
@@ -96,9 +109,6 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
             >
               {blog.content}
             </Typography>
-            <Button component={RouterLink} to={`/blogs/${blog.slug}`} size="small" sx={{ alignSelf: 'flex-start', px: 0 }}>
-              Read full post
-            </Button>
             <Stack direction="row" spacing={2} sx={{ '& .MuiChip-root': { borderRadius: 2 } }}>
               <Chip variant="filled" icon={<InsightsRoundedIcon fontSize="inherit" />} label={`${blog.view_count} views`} />
               <Chip
@@ -127,7 +137,10 @@ export default function BlogCard({ blog, onLikeToggle }: BlogCardProps) {
               fullWidth
               color={blog.is_liked ? 'error' : 'secondary'}
               endIcon={blog.is_liked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-              onClick={() => onLikeToggle()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onLikeToggle();
+              }}
             >
               Like or unlike
             </Button>

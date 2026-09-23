@@ -224,15 +224,17 @@ export default function DashboardPage() {
                   <Typography color="text.secondary">Loading…</Typography>
                 ) : data?.most_viewed_post ? (
                   <Stack spacing={2}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.45 }}>
+                    <Typography
+                      component={RouterLink}
+                      to={`/blogs/${data.most_viewed_post.slug}`}
+                      variant="subtitle1"
+                      sx={{ fontWeight: 700, lineHeight: 1.45, color: 'text.primary', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
+                    >
                       {data.most_viewed_post.title}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                       <Chip label={`${data.most_viewed_post.view_count.toLocaleString()} views`} size="small" color="primary" />
                     </Stack>
-                    <Button component={RouterLink} to={`/blogs/${data.most_viewed_post.slug}`} variant="contained" sx={{ alignSelf: 'flex-start' }}>
-                      Open post
-                    </Button>
                   </Stack>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
