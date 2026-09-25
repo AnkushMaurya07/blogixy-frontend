@@ -17,7 +17,7 @@ import { useAppSelector } from '../features/auth/hooks';
 import type { ConversationSummary } from '../api/types';
 
 /** Padding applied under main content on small screens so the fixed bar does not cover scroll-end. */
-export const MOBILE_BOTTOM_NAV_EXTRA_PX = 88;
+export const MOBILE_BOTTOM_NAV_EXTRA_PX = 92;
 
 export default function MobileBottomNav() {
   const theme = useTheme();
@@ -45,7 +45,7 @@ export default function MobileBottomNav() {
       if (p.startsWith('/auth')) return 2;
       return false;
     }
-    if (p.startsWith('/dashboard')) return 2;
+    if (p.startsWith('/dashboard')) return false;
     if (p.startsWith('/drafts')) return -1;
     if (p.startsWith('/messages')) return 3;
     if (p.startsWith('/profile') || p.startsWith('/users/')) return 4;
@@ -67,17 +67,20 @@ export default function MobileBottomNav() {
     <Paper
       component="nav"
       elevation={12}
-      square
       sx={{
         position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)',
+        left: { xs: 1.5, sm: '50%' },
+        right: { xs: 1.5, sm: 'auto' },
+        width: { xs: 'auto', sm: 560 },
+        maxWidth: 'calc(100% - 24px)',
+        transform: { xs: 'none', sm: 'translateX(-50%)' },
         zIndex: theme.zIndex.appBar - 1,
-        borderTop: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
-        bgcolor: alpha(theme.palette.background.paper, 0.98),
-        backdropFilter: 'blur(14px)',
-        pb: 'env(safe-area-inset-bottom)',
+        border: `1px solid ${alpha(theme.palette.divider, 0.24)}`,
+        borderRadius: 3,
+        bgcolor: alpha(theme.palette.background.paper, 0.94),
+        backdropFilter: 'blur(20px)',
+        boxShadow: `0 12px 38px ${alpha(theme.palette.common.black, theme.palette.mode === 'light' ? 0.16 : 0.42)}`,
       }}
     >
       {!token ? (
@@ -85,8 +88,32 @@ export default function MobileBottomNav() {
           value={navValue === false ? -1 : navValue}
           showLabels
           sx={{
-            '& .MuiBottomNavigationAction-root': { minWidth: 0, maxWidth: 'none', px: 0.5 },
-            '& .MuiBottomNavigationAction-label': { fontSize: '0.6875rem', opacity: { xs: 0.95, md: 1 } },
+            height: 68,
+            bgcolor: 'transparent',
+            borderRadius: 3,
+            '& .MuiBottomNavigationAction-root': {
+              minWidth: 0,
+              maxWidth: 'none',
+              minHeight: 58,
+              mx: 0.5,
+              my: 0.5,
+              px: 0.5,
+              borderRadius: 2,
+              color: 'text.secondary',
+              transition: 'color 180ms ease, background-color 180ms ease, transform 180ms ease',
+              '&.Mui-selected': {
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.1 : 0.2),
+                transform: 'translateY(-2px)',
+              },
+              '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: -2 },
+            },
+            '& .MuiBottomNavigationAction-label': { fontSize: '0.6875rem', fontWeight: 650, opacity: 1 },
+            '& .MuiBottomNavigationAction-root.Mui-selected .MuiSvgIcon-root': { transform: 'scale(1.08)' },
+            '& .MuiSvgIcon-root': { transition: 'transform 180ms ease' },
+            '@media (prefers-reduced-motion: reduce)': {
+              '& .MuiBottomNavigationAction-root, & .MuiSvgIcon-root': { transition: 'none' },
+            },
           }}
         >
           <BottomNavigationAction
@@ -113,8 +140,33 @@ export default function MobileBottomNav() {
           value={navValue === false ? -1 : navValue}
           showLabels
           sx={{
-            '& .MuiBottomNavigationAction-root': { minWidth: 0, maxWidth: 'none', px: 0.35 },
-            '& .MuiBottomNavigationAction-label': { fontSize: '0.625rem' },
+            height: 68,
+            bgcolor: 'transparent',
+            borderRadius: 3,
+            '& .MuiBottomNavigationAction-root': {
+              flex: '1 1 0',
+              minWidth: 0,
+              maxWidth: 'none',
+              minHeight: 58,
+              mx: 0.4,
+              my: 0.5,
+              px: 0.25,
+              borderRadius: 2,
+              color: 'text.secondary',
+              transition: 'color 180ms ease, background-color 180ms ease, transform 180ms ease',
+              '&.Mui-selected': {
+                color: 'primary.main',
+                bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'light' ? 0.1 : 0.2),
+                transform: 'translateY(-2px)',
+              },
+              '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: -2 },
+            },
+            '& .MuiBottomNavigationAction-label': { fontSize: '0.625rem', fontWeight: 650 },
+            '& .MuiBottomNavigationAction-root.Mui-selected .MuiSvgIcon-root': { transform: 'scale(1.08)' },
+            '& .MuiSvgIcon-root': { transition: 'transform 180ms ease' },
+            '@media (prefers-reduced-motion: reduce)': {
+              '& .MuiBottomNavigationAction-root, & .MuiSvgIcon-root': { transition: 'none' },
+            },
           }}
         >
           <BottomNavigationAction
