@@ -198,12 +198,6 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     if (!canSaveProfile || !profile) return;
-    // eslint-disable-next-line no-console -- intentional debug trace
-    console.log('[ProfilePage] saveProfile start', {
-      userId: profile.id,
-      username: usernameTrimmed,
-      hasNewAvatar: Boolean(avatarFile),
-    });
     try {
       await updateProfile.mutateAsync({
         username: usernameTrimmed,
@@ -212,12 +206,8 @@ export default function ProfilePage() {
         avatar: avatarFile ?? undefined,
       });
       setAvatarFile(null);
-      // eslint-disable-next-line no-console -- intentional debug trace
-      console.log('[ProfilePage] saveProfile success');
       enqueueSnackbar('Profile updated.', { variant: 'success' });
     } catch (err: unknown) {
-      // eslint-disable-next-line no-console -- intentional debug trace
-      console.error('[ProfilePage] saveProfile failed', err, formatProfileUpdateError(err));
       enqueueSnackbar(formatProfileUpdateError(err), { variant: 'error' });
     }
   };

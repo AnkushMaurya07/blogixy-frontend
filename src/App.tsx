@@ -21,7 +21,7 @@ const DraftsPage = lazy(() => import('./pages/DraftsPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 
-function ProtectedRoute({ children }: { children: ReactElement }) {
+export function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = useAppSelector((s) => s.auth.accessToken);
   return token ? children : <Navigate to="/auth" replace />;
 }

@@ -46,36 +46,20 @@ export const useUpdateProfile = () => {
     }) => {
       // Multipart PATCH is flaky in some browsers/network stacks; use JSON when no file upload.
       if (payload.avatar) {
-        // eslint-disable-next-line no-console -- intentional debug trace
-        console.log('[useUpdateProfile] POST multipart', {
-          username: payload.username,
-          email: payload.email,
-          profile_title: payload.profile_title,
-          bioLen: payload.bio?.length,
-          avatar: `${payload.avatar.name} (${payload.avatar.size}b)`,
-        });
         const fd = new FormData();
         if (payload.username !== undefined) fd.append('username', payload.username);
         if (payload.email !== undefined) fd.append('email', payload.email);
         if (payload.profile_title !== undefined) fd.append('profile_title', payload.profile_title ?? '');
         if (payload.bio !== undefined) fd.append('bio', payload.bio ?? '');
         fd.append('avatar', payload.avatar);
-        const data = (await apiClient.post<UserProfile>('/auth/profile/', fd)).data;
-        // eslint-disable-next-line no-console -- intentional debug trace
-        console.log('[useUpdateProfile] multipart success', { id: data.id, username: data.username });
-        return data;
+        return (await apiClient.post<UserProfile>('/auth/profile/', fd)).data;
       }
       const body: Record<string, string> = {};
       if (payload.username !== undefined) body.username = payload.username;
       if (payload.email !== undefined) body.email = payload.email;
       if (payload.profile_title !== undefined) body.profile_title = payload.profile_title ?? '';
       if (payload.bio !== undefined) body.bio = payload.bio ?? '';
-      // eslint-disable-next-line no-console -- intentional debug trace
-      console.log('[useUpdateProfile] POST JSON', body);
-      const data = (await apiClient.post<UserProfile>('/auth/profile/', body)).data;
-      // eslint-disable-next-line no-console -- intentional debug trace
-      console.log('[useUpdateProfile] JSON success', { id: data.id, username: data.username });
-      return data;
+      return (await apiClient.post<UserProfile>('/auth/profile/', body)).data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
