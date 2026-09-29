@@ -22,17 +22,25 @@ afterEach(() => {
 describe('API client authentication', () => {
   it('refreshes an expired access token and retries the original request once', async () => {
     store.dispatch(setTokens({ access: 'expired-access', refresh: 'valid-refresh' }));
-    mock.onGet('/private').replyOnce(401).onGet('/private').reply(200, { ok: true });
+    const requestAuthorizations: Array<string | undefined> = [];
+    mock
+      .onGet('/private')
+      .replyOnce((request) => {
+        requestAuthorizations.push(request.headers?.Authorization as string | undefined);
+        return [401];
+      })
+      .onGet('/private')
+      .reply((request) => {
+        requestAuthorizations.push(request.headers?.Authorization as string | undefined);
+        return [200, { ok: true }];
+      });
     mock.onPost('/auth/token/refresh/').reply(200, { access: 'fresh-access' });
 
     const response = await apiClient.get('/private');
 
     expect(response.data).toEqual({ ok: true });
     expect(mock.history.get).toHaveLength(2);
-    expect(mock.history.get.map((request) => request.headers?.Authorization)).toEqual([
-      'Bearer expired-access',
-      'Bearer fresh-access',
-    ]);
+    expect(requestAuthorizations).toEqual(['Bearer expired-access', 'Bearer fresh-access']);
     expect(mock.history.post).toHaveLength(1);
     expect(store.getState().auth.accessToken).toBe('fresh-access');
     expect(localStorage.getItem('accessToken')).toBe('fresh-access');

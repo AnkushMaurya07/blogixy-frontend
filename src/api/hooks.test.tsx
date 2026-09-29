@@ -83,11 +83,12 @@ describe('frontend API hooks', () => {
     const { result } = renderHook(() => useInfiniteHomeFeed({ section: 'all' }), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.hasNextPage).toBe(true);
     await act(async () => {
       await result.current.fetchNextPage();
     });
 
-    expect(result.current.data?.pages.map((page) => page.page)).toEqual([1, 2]);
+    await waitFor(() => expect(result.current.data?.pages.map((page) => page.page)).toEqual([1, 2]));
     expect(mock.history.get.map((request) => request.params?.page)).toEqual([1, 2]);
   });
 });
