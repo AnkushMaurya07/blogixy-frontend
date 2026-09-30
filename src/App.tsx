@@ -1,6 +1,6 @@
-import { Box } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { lazy, Suspense, type ReactElement } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import AppNavbar from './components/AppNavbar';
 import MobileBottomNav, { MOBILE_BOTTOM_NAV_EXTRA_PX } from './components/MobileBottomNav';
@@ -24,6 +24,26 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 export function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = useAppSelector((s) => s.auth.accessToken);
   return token ? children : <Navigate to="/auth" replace />;
+}
+
+function NotFoundPage() {
+  const navigate = useNavigate();
+
+  return (
+    <Box sx={{ maxWidth: 560, mx: 'auto', px: 3, py: 8, textAlign: 'center' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>
+          Page not found
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          The page you were looking for no longer exists or may have moved.
+        </Typography>
+        <Button variant="contained" onClick={() => navigate('/')}>
+          Go home
+        </Button>
+      </Box>
+    </Box>
+  );
 }
 
 function AppRoutes() {
@@ -86,6 +106,7 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </RouteErrorBoundary>
